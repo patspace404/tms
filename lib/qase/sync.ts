@@ -286,6 +286,16 @@ export async function syncResult(
   qaseProjectCode: string,
   runId: string | number,
   caseId: string | number,
+  /**
+   * The Qase result record, when the caller already has it.
+   *
+   * The webhook omits it and one fetch per event is nothing. A backfill walking
+   * 145 runs of 100 cases would otherwise re-download the same run's result
+   * list once per case — tens of thousands of redundant calls, and a fast track
+   * to Qase's rate limit — so `scripts/qase-backfill.ts` fetches each run's
+   * results once and passes the right record in.
+   */
+  known?: any,
 ): Promise<SyncOutcome> {
   const run = await prisma.testRun.findFirst({
     where: { projectId, externalId: String(runId) },
@@ -323,7 +333,8 @@ export async function syncResult(
   // records — a first pass, a "retest", then the real one. Only the newest is
   // the current verdict, and it is the one carrying the final screenshots;
   // taking the first match silently imports a stale, evidence-free attempt.
-  const result = newestResult(await qaseList(`/result/${qaseProjectCode}?run=${runId}`), caseId);
+  const result =
+    known ?? newestResult(await qaseList(`/result/${qaseProjectCode}?run=${runId}`), caseId);
   if (!result) return skipped(`Result for case ${caseId} in run ${runId} not found in Qase.`);
 
   const status = mapResultStatus(result.status);
@@ -397,6 +408,10 @@ async function syncResultEvidence(
   caseId: string,
   result: any,
 ): Promise<string> {
+  // Set by scripts/qase-backfill.ts --skip-attachments, for a fast structural
+  // pass over a large project. Never set in the running app.
+  if (process.env.QASE_SYNC_SKIP_ATTACHMENTS === "1") return "";
+
   let resultLevel = 0;
   let stepLevel = 0;
   const failures: string[] = [];
