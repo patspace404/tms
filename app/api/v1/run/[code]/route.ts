@@ -11,6 +11,7 @@ import {
   requireProject,
   WRITE_ROLES,
 } from "@/lib/api-v1";
+import { resolveCaseRefs } from "@/lib/case-refs";
 import { serializeRun } from "@/lib/api-v1-serializers";
 import { NextResponse } from "next/server";
 
@@ -57,22 +58,7 @@ export const POST = handler(async (req, { params }) => {
 
   let caseIds: string[];
   if (Array.isArray(body.cases) && body.cases.length > 0) {
-    const uuids = body.cases.filter((c: any) => typeof c === "string");
-    const seqs = body.cases
-      .map((c: any) => Number(c))
-      .filter((n: number) => Number.isInteger(n) && n > 0);
-
-    const found = await prisma.testCase.findMany({
-      where: {
-        projectId: ctx.projectId,
-        OR: [
-          ...(uuids.length ? [{ id: { in: uuids } }] : []),
-          ...(seqs.length ? [{ sequenceNumber: { in: seqs } }] : []),
-        ],
-      },
-      select: { id: true },
-    });
-    caseIds = found.map((c) => c.id);
+    caseIds = (await resolveCaseRefs(ctx.projectId, body.cases)).ids;
     if (caseIds.length === 0) return fail("None of the given 'cases' exist in this project.", 422);
   } else {
     const all = await prisma.testCase.findMany({
