@@ -464,6 +464,18 @@ export default function RunExecutionClient({
     name: string;
     isTrace?: boolean;
   } | null>(null);
+
+  // Escape closes the fullscreen viewer. Without it the only exits are the ✕
+  // and the thin strip of backdrop around the content, which is easy to miss —
+  // and left the viewer feeling stuck when the ✕ itself was unreachable.
+  React.useEffect(() => {
+    if (!viewingAttachment) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setViewingAttachment(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [viewingAttachment]);
   const [expandedSuites, setExpandedSuites] = useState<Record<string, boolean>>(
     {},
   );
@@ -2198,8 +2210,12 @@ export default function RunExecutionClient({
         {/* Fullscreen Attachment Viewer (lightbox) */}
         {viewingAttachment && (
           <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-200" onClick={() => setViewingAttachment(null)}>
-            <div className="absolute top-4 right-4 md:top-6 md:right-6">
-              <button onClick={() => setViewingAttachment(null)} className="bg-surface/10 hover:bg-surface/20 text-white rounded-full p-2 transition backdrop-blur-sm"><XCircle size={32} /></button>
+            {/* z-10 is load-bearing: the content layer below is `relative
+                w-full h-full` and comes later in the DOM, so without it that
+                layer paints over this corner and swallows the click on ✕
+                (it stops propagation), leaving the viewer impossible to close. */}
+            <div className="absolute top-4 right-4 md:top-6 md:right-6 z-10">
+              <button onClick={() => setViewingAttachment(null)} aria-label="Close" className="bg-surface/10 hover:bg-surface/20 text-white rounded-full p-2 transition backdrop-blur-sm"><XCircle size={32} /></button>
             </div>
             <div className="relative w-full h-full flex items-center justify-center animate-in zoom-in-95 duration-200 p-8 pt-16" onClick={(e) => e.stopPropagation()}>
               {viewingAttachment.url?.match(/\.(mp4|webm|ogg)$/i) ? (
