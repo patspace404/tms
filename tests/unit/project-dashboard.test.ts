@@ -97,7 +97,11 @@ describe("GET /api/projects/[code]/dashboard", () => {
           { status: "FAILED" },
           { status: "BLOCKED" },
           { status: "SKIPPED" },
-          { status: "UNTESTED" },
+          { status: "INVALID" },
+          // "UNTESTED" used to be here, but TestResultStatus is a Postgres
+          // enum of PASSED/FAILED/BLOCKED/SKIPPED/IN_PROGRESS/INVALID — the
+          // database rejects anything else, so no row can ever carry it.
+          // INVALID takes its place and covers the case that does exist.
           { status: "IN_PROGRESS" },
         ],
       },
@@ -118,7 +122,10 @@ describe("GET /api/projects/[code]/dashboard", () => {
         failed: 1,
         blocked: 1,
         skipped: 1,
-        untested: 2,
+        invalid: 1,
+        // Only IN_PROGRESS is untested; skipped and invalid are verdicts.
+        untested: 1,
+        decided: 6,
       },
     });
   });

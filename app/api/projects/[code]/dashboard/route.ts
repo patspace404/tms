@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { runStats } from "@/lib/run-stats";
 
 export async function GET(
   request: Request,
@@ -52,14 +53,9 @@ export async function GET(
     });
 
     const formattedRecentRuns = recentRuns.map((run) => {
-      const total = run.results.length;
-      const passed = run.results.filter((r) => r.status === "PASSED").length;
-      const failed = run.results.filter((r) => r.status === "FAILED").length;
-      const blocked = run.results.filter((r) => r.status === "BLOCKED").length;
-      const skipped = run.results.filter((r) => r.status === "SKIPPED").length;
-      const untested = run.results.filter(
-        (r) => r.status === "IN_PROGRESS" || r.status === ("UNTESTED" as any),
-      ).length;
+      // One definition of run progress across the app — see lib/run-stats.ts.
+      const { total, passed, failed, blocked, skipped, invalid, untested, decided } =
+        runStats(run.results);
 
       return {
         id: run.id,
@@ -72,7 +68,9 @@ export async function GET(
           failed,
           blocked,
           skipped,
+          invalid,
           untested,
+          decided,
         },
       };
     });

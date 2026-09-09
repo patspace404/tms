@@ -27,6 +27,7 @@ import {
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { DashboardFilters } from "./DashboardFilters";
+import { runStats } from "@/lib/run-stats";
 
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
@@ -327,9 +328,9 @@ export default async function GlobalDashboardPage({
       const activeRuns = project.testRuns.filter((run) => run.status === "ACTIVE").length;
       const latestRun = project.testRuns[0];
       const recentHealth = project.testRuns.slice(0, 7).reverse().map((run) => {
-        const executed = run.results.filter((result) => result.status !== "IN_PROGRESS").length;
-        const passed = run.results.filter((result) => result.status === "PASSED").length;
-        return executed ? Math.round((passed / executed) * 100) : health;
+        // Same rule as everywhere else — see lib/run-stats.ts.
+        const { decided, passRate } = runStats(run.results);
+        return decided ? passRate : health;
       });
       const [healthBg, healthColor] = healthTone(health);
       const [iconBg, iconColor] = projectBadgeTone(project.code);

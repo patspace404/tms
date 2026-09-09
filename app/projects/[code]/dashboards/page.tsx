@@ -28,6 +28,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ProjectDashboardFilters } from "./ProjectDashboardFilters";
+import { runStats } from "@/lib/run-stats";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -66,7 +67,11 @@ type RecentRun = {
     failed: number;
     blocked: number;
     skipped: number;
+    invalid: number;
+    /** Only IN_PROGRESS — see lib/run-stats.ts. */
     untested: number;
+    /** Everything with a verdict, skipped and invalid included. */
+    decided: number;
   };
 };
 
@@ -637,18 +642,13 @@ export default async function ProjectDashboardPage({
       }),
       recentRuns: recentRuns.map((run) => {
         const total = run.results.length;
-        const passed = run.results.filter((r) => r.status === "PASSED").length;
-        const failed = run.results.filter((r) => r.status === "FAILED").length;
-        const blocked = run.results.filter(
-          (r) => r.status === "BLOCKED",
-        ).length;
-        const skipped = run.results.filter(
-          (r) => r.status === "SKIPPED",
-        ).length;
-        const untested = total - passed - failed - blocked - skipped;
+        // Subtracting the known statuses used to sweep INVALID into
+        // "untested"; runStats counts only IN_PROGRESS as awaiting a verdict.
+        const s = runStats(run.results);
+        const { passed, failed, blocked, skipped, invalid, untested, decided } = s;
 
         totalPassed += passed;
-        totalExecuted += total - untested;
+        totalExecuted += decided;
 
         return {
           id: run.id,
@@ -657,7 +657,7 @@ export default async function ProjectDashboardPage({
           createdAt: run.createdAt,
           project: run.project,
           environment: run.environment,
-          metrics: { total, passed, failed, blocked, skipped, untested },
+          metrics: { total, passed, failed, blocked, skipped, invalid, untested, decided },
         };
       }),
       schedules,
@@ -700,7 +700,7 @@ export default async function ProjectDashboardPage({
     (run) => run.status !== "COMPLETED" && run.metrics.untested > 0,
   ).length;
   const executedResults = recentRuns.reduce(
-    (sum, run) => sum + run.metrics.passed + run.metrics.failed + run.metrics.blocked + run.metrics.skipped,
+    (sum, run) => sum + run.metrics.decided,
     0,
   );
 
