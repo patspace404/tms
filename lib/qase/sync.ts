@@ -14,7 +14,10 @@
  * result row per case, so by the time Qase reports an outcome the row already
  * exists. A row still sitting at IN_PROGRESS is a placeholder this sync made,
  * so it gets filled in; a row that already carries a real verdict was decided
- * by a person or an earlier event, and is left alone.
+ * by a person or an earlier event, and its verdict is left alone. Evidence is
+ * the exception: screenshots are only ever *added*, so they are copied onto a
+ * settled result too — otherwise every project migrated before this sync
+ * existed would keep its verdicts and lose its images.
  *
  * Webhook payloads are used only to identify *what* changed. The actual data is
  * re-fetched from the Qase REST API, because the payload shape varies between
@@ -367,8 +370,17 @@ export async function syncResult(
     });
     resultId = existing.id;
   } else {
-    return skipped(
-      `Result for case ${caseId} already recorded as ${existing.status} — left as is.`,
+    // The verdict stands — but evidence is purely additive, and refusing to
+    // copy it would strand every screenshot behind an already-recorded result.
+    // That is most of them on a project migrated before this sync existed.
+    const evidence = await syncResultEvidence(projectId, existing.id, testCase.id, result);
+    if (!evidence) {
+      return skipped(
+        `Result for case ${caseId} already recorded as ${existing.status} — left as is.`,
+      );
+    }
+    return processed(
+      `Result for case ${caseId} kept as ${existing.status}; evidence only.${evidence}`,
     );
   }
 
