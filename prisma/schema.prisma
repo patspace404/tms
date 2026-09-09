@@ -145,12 +145,12 @@ model PasswordResetToken {
 /// creation, and is unrecoverable afterwards. A request authenticated with a
 /// token acts as `user`, so it inherits exactly that user's project roles.
 model ApiToken {
-  id        String    @id @default(uuid())
-  name      String // human label, e.g. "GitHub Actions"
-  tokenHash String    @unique // sha256 of the plaintext token
-  prefix    String // first chars, shown in the UI so a token is recognisable
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String    @id @default(uuid())
+  name       String // human label, e.g. "GitHub Actions"
+  tokenHash  String    @unique // sha256 of the plaintext token
+  prefix     String // first chars, shown in the UI so a token is recognisable
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   lastUsedAt DateTime?
   expiresAt  DateTime?
   revokedAt  DateTime?
@@ -242,6 +242,12 @@ model Project {
   githubWorkflowId  String?
   msTeamsWebhookUrl String?
 
+  /// Qase project code this project mirrors, e.g. "BO". Set it to opt the
+  /// project into webhook sync; leaving it null means Qase events for that
+  /// code are recorded and ignored. Unique so an incoming event maps to
+  /// exactly one project.
+  qaseProjectCode String? @unique
+
   suites             TestSuite[]
   testCases          TestCase[]
   testRuns           TestRun[]
@@ -323,7 +329,7 @@ model TestCase {
   testPlans   TestPlan[]      @relation("TestPlanToTestCase")
 
   customFields   Json? // Stores custom field values
-  sequenceNumber Int   @default(0)
+  sequenceNumber Int     @default(0)
   externalId     String? // e.g. Qase case id, for one-off migration idempotency
 
   createdAt DateTime @default(now())
@@ -485,7 +491,7 @@ model TestPlan {
   projectId String
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  testCases TestCase[] @relation("TestPlanToTestCase")
+  testCases TestCase[]         @relation("TestPlanToTestCase")
   testRuns  TestRun[]
   pipelines PipelineSchedule[]
 
@@ -670,4 +676,45 @@ model Notification {
   createdAt   DateTime         @default(now())
 
   @@index([recipientId, isRead, createdAt])
+}
+
+/// Every webhook delivery Qase makes, recorded before it is acted on.
+///
+/// A webhook you cannot inspect is a black box: this is what makes it possible
+/// to answer "did Qase send it?" separately from "did we handle it?", and to
+/// replay a delivery that failed while the app was down.
+model QaseWebhookEvent {
+  id String @id @default(uuid())
+
+  /// Qase's `event_name`, e.g. "case.created", verbatim — including ones we
+  /// do not handle, so unknown events surface instead of vanishing.
+  eventName   String
+  /// Qase's `project_code` from the envelope.
+  projectCode String
+  /// Id of the Qase entity the event is about, when the payload carries one.
+  externalId  String?
+
+  status  QaseWebhookStatus @default(RECEIVED)
+  /// Why it was skipped, or the error if it failed.
+  message String?           @db.Text
+  /// The raw delivery, so a handler can be fixed and the event replayed.
+  payload Json
+
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([projectCode, receivedAt])
+  @@index([status, receivedAt])
+}
+
+enum QaseWebhookStatus {
+  /// Stored, not yet acted on.
+  RECEIVED
+  /// Applied to the database.
+  PROCESSED
+  /// Deliberately not applied — unknown event, unmapped project, or a record
+  /// that already exists (sync is additive and never overwrites).
+  SKIPPED
+  /// Handler threw. `message` holds the error; the payload is kept for replay.
+  FAILED
 }
