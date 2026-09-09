@@ -49,14 +49,14 @@ fi
   STATUS=$?
 
   echo "=== finished in $(( $(date +%s) - START ))s, exit $STATUS ==="
-  exit $STATUS
+# Braces, not a subshell: STATUS set inside is still readable here. An `exit`
+# in this block would end the whole script and skip the summary below.
 } >> "$LOG" 2>&1
-
-STATUS=$?
 
 # A one-line summary of every run, so "did last night work?" is one command:
 #   tail ~/qase-sync-logs/summary.log
-SUMMARY=$(grep -E "^\[.*ALL DONE" "$LOG" | tail -1)
+# The backfill prints this on its own line, with no timestamp prefix.
+SUMMARY=$(grep -F "ALL DONE" "$LOG" | tail -1)
 printf '%s  exit=%s  %s\n' \
   "$(date -u '+%Y-%m-%d %H:%M')Z" "$STATUS" "${SUMMARY:-no summary — see $LOG}" \
   >> "$LOG_DIR/summary.log"
