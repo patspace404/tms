@@ -15,8 +15,10 @@ import {
   CheckCircle2,
   XCircle,
   Ban,
+  SkipForward,
 } from "lucide-react";
 import { useProjectRole } from "@/components/providers/ProjectRoleProvider";
+import { runStats } from "@/lib/run-stats";
 
 // Color thresholds mirror the design's <script> data shaping.
 // Ring + completion bar use raw CSS vars (needed in SVG stroke / inline style).
@@ -148,15 +150,13 @@ export function TestRunsList({ initialRuns, code }: TestRunsListProps) {
   filteredRuns.forEach((r) => grouped[zoneOf(r)].push(r));
 
   const renderRunRow = (run: any) => {
-    const passed = run.results.filter((r: any) => r.status === "PASSED").length;
-    const failed = run.results.filter((r: any) => r.status === "FAILED").length;
-    const blocked = run.results.filter((r: any) => r.status === "BLOCKED").length;
-    const total = run.results.length;
-    const executed = passed + failed + blocked;
-    // completion = executed / total ; passRate = passed / executed (design's donut)
-    const completionPercent =
-      total > 0 ? Math.round((executed / total) * 100) : 0;
-    const passRate = executed > 0 ? Math.round((passed / executed) * 100) : 0;
+    // Shared with every other screen — see lib/run-stats.ts for why skipped
+    // counts as decided.
+    const { passed, failed, blocked, skipped, completionPercent, passRate, isFullyDecided } =
+      runStats(run.results);
+    // Tested everything but nobody closed the run — worth a nudge, since
+    // nothing else on this board says so.
+    const readyToClose = isFullyDecided && run.status === "ACTIVE";
 
     // Color thresholds from the design <script>.
     const compColor = compColorFor(completionPercent);
@@ -181,6 +181,17 @@ export function TestRunsList({ initialRuns, code }: TestRunsListProps) {
                 {run.id}
               </div>
             </Link>
+            {/* Every case has a verdict but the run is still open. Nothing else
+                on this board says so, so a finished run can sit in Active
+                indefinitely without anyone noticing. */}
+            {readyToClose && (
+              <span
+                className="mt-[6px] inline-flex items-center gap-[4px] rounded-[6px] bg-success-soft px-[7px] py-[2px] text-[10.5px] font-semibold text-success"
+                title="All cases have a result — this run can be completed"
+              >
+                <CheckCircle2 size={11} />Ready to close
+              </span>
+            )}
           </div>
           
           {/* Circular progress SVG */}
@@ -220,6 +231,17 @@ export function TestRunsList({ initialRuns, code }: TestRunsListProps) {
             <span className="flex items-center gap-[4px] text-[11px] font-semibold text-warning">
               <Ban size={13} />{blocked}
             </span>
+            {/* Only when there are any: shown so the counts add up to the run's
+                total. Skipped cases used to be invisible here, leaving a gap
+                nothing on the card explained. */}
+            {skipped > 0 && (
+              <span
+                className="flex items-center gap-[4px] text-[11px] font-semibold text-text-faint"
+                title={`${skipped} skipped`}
+              >
+                <SkipForward size={13} />{skipped}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-[6px]">
             <span className="text-[11px] text-text-faint truncate max-w-[60px]">{run.environment?.title || "No Env"}</span>
