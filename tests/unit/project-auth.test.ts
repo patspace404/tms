@@ -50,6 +50,54 @@ describe("getProjectRole", () => {
 
     expect(role).toBe("VIEWER");
   });
+
+  // The workspace "Administrator" and "Owner" roles carry permissions: ["all"].
+  // Before this, that badge granted nothing inside a project: the holder
+  // resolved to VIEWER and lost every create button with no explanation.
+  it('returns ADMIN for a workspace role carrying "all", without membership', async () => {
+    userMock.findUnique.mockResolvedValue({
+      role: "USER",
+      workspaceRole: { permissions: ["all"] },
+    });
+
+    const role = await getProjectRole("FIN", "user-001");
+
+    expect(role).toBe("ADMIN");
+    expect(projectMock.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('returns ADMIN for a workspace role granted "prj-owner" explicitly', async () => {
+    userMock.findUnique.mockResolvedValue({
+      role: "USER",
+      workspaceRole: { permissions: ["tc-repository", "prj-owner"] },
+    });
+
+    expect(await getProjectRole("FIN", "user-001")).toBe("ADMIN");
+  });
+
+  it("leaves a limited workspace role to its project membership", async () => {
+    // "Member" holds tc-repository + tc-create — real permissions, but not
+    // project ownership, so it must not be promoted.
+    userMock.findUnique.mockResolvedValue({
+      role: "USER",
+      workspaceRole: { permissions: ["tc-repository", "tc-create"] },
+    });
+    projectMock.findUnique.mockResolvedValue({ id: "proj-fin" });
+    projectMemberMock.findUnique.mockResolvedValue({ role: "EDITOR" });
+
+    expect(await getProjectRole("FIN", "user-001")).toBe("EDITOR");
+  });
+
+  it("leaves a read-only workspace role as VIEWER", async () => {
+    userMock.findUnique.mockResolvedValue({
+      role: "USER",
+      workspaceRole: { permissions: ["tc-repository", "tr-view", "ws-users-view"] },
+    });
+    projectMock.findUnique.mockResolvedValue({ id: "proj-fin" });
+    projectMemberMock.findUnique.mockResolvedValue(null);
+
+    expect(await getProjectRole("FIN", "user-001")).toBe("VIEWER");
+  });
 });
 
 describe("requireProjectRole", () => {

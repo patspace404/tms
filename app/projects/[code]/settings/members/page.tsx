@@ -33,7 +33,7 @@ export default async function ProjectMembersPage({
         members: {
           include: {
             user: {
-              include: { workspaceRole: { select: { title: true } } },
+              include: { workspaceRole: { select: { title: true, permissions: true } } },
             },
           },
         },

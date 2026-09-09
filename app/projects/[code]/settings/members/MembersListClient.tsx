@@ -16,12 +16,14 @@ interface Group {
 interface Member {
   id: string;
   userId: string;
+  /** ProjectRole — what this person can actually do *here*. */
+  role: string;
   user: {
     id: string;
     name: string | null;
     email: string;
     role: string;
-    workspaceRole: { title: string } | null;
+    workspaceRole: { title: string; permissions?: unknown } | null;
   };
 }
 
@@ -30,8 +32,39 @@ interface WsMember {
   name: string | null;
   email: string;
   role: string;
-  workspaceRole: { title: string } | null;
+  workspaceRole: { title: string; permissions?: unknown } | null;
 }
+
+/**
+ * Whether this person already has full access from outside the project — a
+ * system admin, or a workspace role carrying "all" (Administrator, Owner).
+ * Their project role is not what decides anything, so the row must say so
+ * rather than showing a "Viewer" badge that means nothing.
+ */
+function elevatedBy(user: {
+  role: string;
+  workspaceRole: { title: string; permissions?: unknown } | null;
+}): string | null {
+  if (user.role === "ADMIN") return "system admin";
+  const perms = user.workspaceRole?.permissions;
+  if (Array.isArray(perms) && perms.includes("all")) {
+    return `workspace ${user.workspaceRole?.title ?? "role"}`;
+  }
+  return null;
+}
+
+/** ProjectRole → label. The three values ProjectMember.role can hold. */
+const PROJECT_ROLES: Record<string, string> = {
+  ADMIN: "Admin",
+  EDITOR: "Editor",
+  VIEWER: "Viewer",
+};
+
+const ROLE_HINT: Record<string, string> = {
+  ADMIN: "Full access, including project settings and members",
+  EDITOR: "Can create and edit cases, runs and results",
+  VIEWER: "Read-only — no create or edit buttons",
+};
 
 const AVS = [
   { bg: 'var(--primary-soft)', color: 'var(--primary-text)' },
@@ -130,6 +163,7 @@ export function MembersListClient({
         {
           id: `${u.id}-${projectCode}`,
           userId: u.id,
+          role: "VIEWER",
           user: {
             id: u.id,
             name: u.name,
@@ -211,18 +245,27 @@ export function MembersListClient({
     setShowDropdown(false);
   };
 
-  const getRoleLabel = (member: Member) => {
-    if (member.user.workspaceRole?.title)
-      return member.user.workspaceRole.title;
-    return member.user.role === "ADMIN" ? "Admin" : "Member";
+  const changeRole = async (userId: string, role: string) => {
+    const prev = members;
+    setMembers((ms) => ms.map((m) => (m.userId === userId ? { ...m, role } : m)));
+    try {
+      const res = await fetch(`/api/projects/${projectCode}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, role }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Failed");
+      toast.success(`Role changed to ${PROJECT_ROLES[role] ?? role}`);
+    } catch (e: any) {
+      setMembers(prev);
+      toast.error(e.message || "Could not change the role");
+    }
   };
 
-  const getRoleStyle = (roleLabel: string, baseRole: string) => {
-    const l = roleLabel.toLowerCase();
-    if (baseRole === "ADMIN" || l.includes("admin")) return { bg: 'var(--warning-soft)', color: 'var(--warning-foreground)' };
-    if (l.includes("lead")) return { bg: 'var(--info-soft-fill)', color: 'var(--info)' };
-    if (l.includes("viewer")) return { bg: 'var(--surface-2)', color: 'var(--text-faint)' };
-    return { bg: 'var(--surface-2)', color: 'var(--text-muted)' };
+  const getRoleStyle = (projectRole: string) => {
+    if (projectRole === "ADMIN") return { bg: 'var(--warning-soft)', color: 'var(--warning-foreground)' };
+    if (projectRole === "EDITOR") return { bg: 'var(--info-soft-fill)', color: 'var(--info)' };
+    return { bg: 'var(--surface-2)', color: 'var(--text-faint)' };
   };
 
   return (
@@ -255,8 +298,8 @@ export function MembersListClient({
         {members.map(m => {
           const name = m.user.name || "Unknown";
           const av = avatarInfo(name !== "Unknown" ? name : m.user.email);
-          const roleLabel = getRoleLabel(m);
-          const rStyle = getRoleStyle(roleLabel, m.user.role);
+          const rStyle = getRoleStyle(m.role);
+          const elevated = elevatedBy(m.user);
           
           return (
             <div key={m.userId} className="grid grid-cols-[2fr_1fr_60px] gap-[14px] p-[12px_18px] items-center border-b border-border last:border-0 hover:bg-surface-hover transition-colors">
@@ -270,10 +313,35 @@ export function MembersListClient({
                 </div>
               </div>
               
+              {/* The role that actually decides what this person can do here.
+                  This is the screen someone opens to answer "why can't they
+                  create a run?", so it shows the deciding role — and says when
+                  the decision is being made above the project instead. */}
               <div>
-                <span className="inline-flex items-center gap-[5px] text-[11.5px] font-semibold p-[3px_9px] rounded-[7px]" style={{ background: rStyle.bg, color: rStyle.color }}>
-                  {roleLabel}
-                </span>
+                {elevated ? (
+                  <span
+                    title={`Full access from their ${elevated} — the project role does not apply`}
+                    className="inline-flex items-center gap-[5px] text-[11.5px] font-semibold p-[3px_9px] rounded-[7px]"
+                    style={{ background: 'var(--warning-soft)', color: 'var(--warning-foreground)' }}
+                  >
+                    Admin
+                    <span className="font-normal opacity-70">· {elevated}</span>
+                  </span>
+                ) : (
+                  <select
+                    value={m.role}
+                    onChange={(e) => changeRole(m.userId, e.target.value)}
+                    title={ROLE_HINT[m.role]}
+                    className="text-[11.5px] font-semibold p-[3px_9px] rounded-[7px] border-0 outline-none cursor-pointer appearance-none focus:ring-2 focus:ring-[color:var(--ring)]"
+                    style={{ background: rStyle.bg, color: rStyle.color }}
+                  >
+                    {Object.entries(PROJECT_ROLES).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               
               <div className="flex justify-end">

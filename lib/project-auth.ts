@@ -1,14 +1,24 @@
 import { prisma } from "@/lib/prisma";
+import { hasPermission } from "@/lib/permissions";
 import { ProjectRole } from "@prisma/client";
 
 export async function getProjectRole(projectCode: string, userId: string): Promise<ProjectRole | null> {
-  // Check if user is a system admin
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { role: true }
+    select: { role: true, workspaceRole: { select: { permissions: true } } },
   });
 
   if (user?.role === 'ADMIN') {
+    return 'ADMIN';
+  }
+
+  // A workspace role carrying "all" — Administrator and Owner — means all,
+  // inside projects too. Without this the badge on Workspace → Users grants
+  // nothing here: the person is shown as "Administrator", silently resolves to
+  // VIEWER, and loses every create/edit button with no explanation. Roles that
+  // list specific permissions (Member, Read-only) are unaffected and still fall
+  // through to their project membership below.
+  if (hasPermission(user, 'prj-owner')) {
     return 'ADMIN';
   }
 
