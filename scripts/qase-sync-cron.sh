@@ -39,10 +39,13 @@ if [ -f .env ]; then
 fi
 
 {
+  echo "=== args: ${*:-(none)}"
   echo "=== Qase sync started $(date -u '+%Y-%m-%d %H:%M:%S')Z ($(TZ=Asia/Bangkok date '+%H:%M') Bangkok) ==="
   START=$(date +%s)
 
-  npx tsx scripts/qase-backfill.ts
+  # Arguments pass straight through, so the same wrapper can be used to check
+  # the cron environment safely (`--dry-run`) or to sync one project by hand.
+  npx tsx scripts/qase-backfill.ts "$@"
   STATUS=$?
 
   echo "=== finished in $(( $(date +%s) - START ))s, exit $STATUS ==="
