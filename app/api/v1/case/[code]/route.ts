@@ -11,6 +11,7 @@ import {
   requireProject,
   WRITE_ROLES,
 } from "@/lib/api-v1";
+import { allocateSequenceNumber } from "@/lib/case-sequence";
 import { serializeCase } from "@/lib/api-v1-serializers";
 import { NextResponse } from "next/server";
 
@@ -93,11 +94,7 @@ export const POST = handler(async (req, { params }) => {
   // sequenceNumber is unique per project and is what "PRO-42" refers to, so it
   // must be allocated atomically or two concurrent creates collide.
   const created = await prisma.$transaction(async (tx) => {
-    const project = await tx.project.update({
-      where: { id: ctx.projectId },
-      data: { caseSequence: { increment: 1 } },
-      select: { caseSequence: true },
-    });
+    const sequenceNumber = await allocateSequenceNumber(tx, ctx.projectId);
 
     return tx.testCase.create({
       data: {
@@ -111,7 +108,7 @@ export const POST = handler(async (req, { params }) => {
         projectId: ctx.projectId,
         suiteId: body.suite_id ?? null,
         authorId: ctx.actor.userId,
-        sequenceNumber: project.caseSequence,
+        sequenceNumber,
         steps: steps.length
           ? {
               create: steps.map((s: any, i: number) => ({

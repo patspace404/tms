@@ -2,6 +2,7 @@
 // # จัดการ Project และ Cases ภายใต้ Project
 // app/api/projects/[code]/cases/route.ts
 import { prisma } from "@/lib/prisma";
+import { allocateSequenceNumber } from "@/lib/case-sequence";
 import { NextResponse } from "next/server";
 import { AutomationStatus, Prisma } from "@prisma/client";
 import { getServerSession } from "next-auth/next";
@@ -87,16 +88,12 @@ export async function POST(
     const { tags, attachmentIds, steps, customFields, ...rest } = validatedData;
 
     const testCase = await prisma.$transaction(async (tx) => {
-      const updatedProject = await tx.project.update({
-        where: { id: projectId },
-        data: { caseSequence: { increment: 1 } },
-        select: { caseSequence: true },
-      });
+      const sequenceNumber = await allocateSequenceNumber(tx, projectId);
       return tx.testCase.create({
         data: {
           ...rest,
           projectId: projectId,
-          sequenceNumber: updatedProject.caseSequence,
+          sequenceNumber,
           tags:
             tags && tags.length > 0
               ? {

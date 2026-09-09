@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { ProjectRole } from "@prisma/client";
+import { Prisma, ProjectRole } from "@prisma/client";
 import { getProjectRole } from "@/lib/project-auth";
 import {
   ApiActor,
@@ -99,6 +99,22 @@ export function handler(
       return await fn(req, ctx);
     } catch (err) {
       console.error("[api/v1]", err);
+      // A bare "Internal server error." tells the caller nothing and hides
+      // constraint violations that are really the caller's or the data's
+      // problem, so name the ones we can recognise.
+      if (err instanceof Prisma.PrismaClientKnownRequestError) {
+        const target = Array.isArray(err.meta?.target)
+          ? (err.meta.target as string[]).join(", ")
+          : String(err.meta?.target ?? "");
+        if (err.code === "P2002") {
+          return fail(
+            `Unique constraint violated${target ? ` on: ${target}` : ""}.`,
+            409,
+          );
+        }
+        if (err.code === "P2003") return fail("Referenced record does not exist.", 422);
+        if (err.code === "P2025") return fail("Record not found.", 404);
+      }
       return fail("Internal server error.", 500);
     }
   };

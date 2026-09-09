@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const projectMock = vi.hoisted(() => ({ findFirst: vi.fn(), update: vi.fn() }));
-const testCaseMock = vi.hoisted(() => ({ create: vi.fn(), findMany: vi.fn() }));
+const testCaseMock = vi.hoisted(() => ({ create: vi.fn(), findMany: vi.fn(), aggregate: vi.fn() }));
 const transactionMock = vi.hoisted(() => vi.fn());
 const sessionMock = vi.hoisted(() => ({ getServerSession: vi.fn() }));
 const requireProjectRoleMock = vi.hoisted(() => vi.fn());
@@ -34,6 +34,8 @@ describe("POST /api/projects/[code]/cases", () => {
     vi.clearAllMocks();
     projectMock.findFirst.mockResolvedValue(existingProject);
     projectMock.update.mockResolvedValue({ caseSequence: 1 });
+    // allocateSequenceNumber checks the highest row before trusting the counter
+    testCaseMock.aggregate.mockResolvedValue({ _max: { sequenceNumber: null } });
     sessionMock.getServerSession.mockResolvedValue(authedSession);
     requireProjectRoleMock.mockResolvedValue(true);
     transactionMock.mockImplementation(async (cb) =>

@@ -73,9 +73,17 @@ async function main() {
 
   // Keep the project's caseSequence counter in sync so the app's "create case"
   // route generates the next sequenceNumber without colliding with these.
+  // Raise it to the highest row present rather than setting it to this run's
+  // CASES.length — a second run, or cases added through the UI in between,
+  // would otherwise push the counter backwards and every later create would
+  // collide on @@unique([projectId, sequenceNumber]).
+  const { _max } = await prisma.testCase.aggregate({
+    where: { projectId: project.id },
+    _max: { sequenceNumber: true },
+  });
   await prisma.project.update({
     where: { id: project.id },
-    data: { caseSequence: CASES.length },
+    data: { caseSequence: Math.max(_max.sequenceNumber ?? 0, CASES.length) },
   });
 
   // 6. Write the mapping for Playwright to consume

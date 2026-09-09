@@ -80,6 +80,8 @@ describe("project cases API route", () => {
             title: validCaseBody.title,
             sequenceNumber: 8,
           }),
+          // allocateSequenceNumber checks the highest row before trusting the counter
+          aggregate: vi.fn().mockResolvedValue({ _max: { sequenceNumber: 7 } }),
         },
       }),
     );
