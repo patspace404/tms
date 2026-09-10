@@ -1,5 +1,6 @@
 import React from "react";
 import { formatThaiTime } from "@/lib/utils";
+import { formatDuration } from "@/lib/format-duration";
 
 interface PdfReportTemplateProps {
   run: any;
@@ -29,20 +30,11 @@ export function PdfReportTemplate({
 
   const completionRate = total > 0 ? Math.round((passed / total) * 100) : 0;
 
-  // Format total duration
   const totalTimeSpent =
     run.results?.reduce((sum: number, r: any) => sum + (r.timeSpent || 0), 0) ||
     0;
-  const minutes = Math.floor(totalTimeSpent / 60000);
-  const seconds = Math.floor((totalTimeSpent % 60000) / 1000);
-  const durationStr = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+  const durationStr = formatDuration(totalTimeSpent, "0s");
 
-  const fmtDur = (ms: number) => {
-    if (!ms) return "—";
-    const m = Math.floor(ms / 60000);
-    const s = Math.floor((ms % 60000) / 1000);
-    return m > 0 ? `${m}m ${s}s` : `${s}s`;
-  };
   const userLabel = (u: any) =>
     u ? u.name || u.email?.split("@")[0] || "—" : "Unassigned";
 
@@ -910,7 +902,7 @@ export function PdfReportTemplate({
                         )}
                         <div>
                           <strong style={{ color: "#475569" }}>Time:</strong>{" "}
-                          {fmtDur(res.timeSpent || 0)}
+                          {formatDuration(res.timeSpent || 0)}
                         </div>
                       </div>
                     </td>
