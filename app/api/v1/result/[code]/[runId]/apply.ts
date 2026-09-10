@@ -68,7 +68,15 @@ export async function applyResult(
   // execution page reads step outcomes keyed by TestStep.id.
   let stepResults = (existing.stepResults as Record<string, any>) ?? {};
   if (Array.isArray(body.steps)) {
-    const next: Record<string, any> = { ...stepResults };
+    // Keep only outcomes for the case's CURRENT steps. Editing a case replaces
+    // its TestStep rows with new ids, so prior stepResults keyed by the old ids
+    // are orphaned — carrying them forward makes the result show more step rows
+    // than the case has. Start from the live step set instead of spreading all.
+    const liveIds = new Set(testCase.steps.map((t) => t.id));
+    const next: Record<string, any> = {};
+    for (const [id, val] of Object.entries(stepResults)) {
+      if (liveIds.has(id)) next[id] = val;
+    }
     body.steps.forEach((s, i) => {
       const target = testCase.steps[i];
       if (!target) return;
