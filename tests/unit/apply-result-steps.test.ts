@@ -91,3 +91,49 @@ describe("applyResult — step result pruning", () => {
     expect(stepResults.s1.actualResult).toBe("HTTP 200");
   });
 });
+
+describe("applyResult — who ran it", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    testCaseFindFirst.mockResolvedValue(twoStepCase);
+    resultUpdate.mockResolvedValue({});
+  });
+
+  it("assigns an unassigned result to the token owner", async () => {
+    resultFindUnique.mockResolvedValue({ id: "res-1", stepResults: {}, assigneeId: null });
+
+    await applyResult("proj-1", "run-1", { case_id: "case-1", status: "PASSED" }, "user-7");
+
+    expect(lastUpdateData()).toMatchObject({ executedById: "user-7", assigneeId: "user-7" });
+  });
+
+  it("leaves an existing assignee alone", async () => {
+    resultFindUnique.mockResolvedValue({ id: "res-1", stepResults: {}, assigneeId: "user-3" });
+
+    await applyResult("proj-1", "run-1", { case_id: "case-1", status: "PASSED" }, "user-7");
+
+    const data = lastUpdateData();
+    expect(data.executedById).toBe("user-7");
+    expect(data).not.toHaveProperty("assigneeId");
+  });
+
+  it("assigns nobody when the caller is anonymous", async () => {
+    resultFindUnique.mockResolvedValue({ id: "res-1", stepResults: {}, assigneeId: null });
+
+    await applyResult("proj-1", "run-1", { case_id: "case-1", status: "PASSED" });
+
+    expect(lastUpdateData()).not.toHaveProperty("assigneeId");
+  });
+
+  it("records time_spent_ms, rounded", async () => {
+    resultFindUnique.mockResolvedValue({ id: "res-1", stepResults: {}, assigneeId: null });
+
+    await applyResult(
+      "proj-1", "run-1",
+      { case_id: "case-1", status: "PASSED", time_spent_ms: 62_499.6 },
+      "user-7",
+    );
+
+    expect(lastUpdateData().timeSpent).toBe(62_500);
+  });
+});

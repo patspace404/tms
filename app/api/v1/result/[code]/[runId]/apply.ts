@@ -58,7 +58,7 @@ export async function applyResult(
 
   const existing = await prisma.testRunResult.findUnique({
     where: { runId_caseId: { runId, caseId: testCase.id } },
-    select: { id: true, stepResults: true },
+    select: { id: true, stepResults: true, assigneeId: true },
   });
   if (!existing) {
     return { error: `Case '${ref}' is not part of this run.`, status: 409 };
@@ -105,6 +105,10 @@ export async function applyResult(
       ...(Array.isArray(body.steps) ? { stepResults } : {}),
       executedAt: new Date(),
       ...(executedById ? { executedById } : {}),
+      // Mirror the execution page: whoever first records an outcome becomes the
+      // assignee. Without this, results submitted through the API stay
+      // unassigned and the run report credits them to nobody.
+      ...(executedById && !existing.assigneeId ? { assigneeId: executedById } : {}),
     },
   });
 
