@@ -14,6 +14,7 @@ const NAV_LINKS = [
   { name: "Projects", href: "/projects" },
   { name: "Workspace", href: "/workspace" },
   { name: "Dashboards", href: "/dashboards" },
+  { name: "Monitor", href: "/monitor" },
 ];
 
 export function TopNav() {
