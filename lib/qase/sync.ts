@@ -373,7 +373,13 @@ export async function syncResult(
     // The verdict stands — but evidence is purely additive, and refusing to
     // copy it would strand every screenshot behind an already-recorded result.
     // That is most of them on a project migrated before this sync existed.
-    const evidence = await syncResultEvidence(projectId, existing.id, testCase.id, result);
+    const evidence = await syncResultEvidence(
+      projectId,
+      existing.id,
+      testCase.id,
+      result,
+      existing.status,
+    );
     if (!evidence) {
       return skipped(
         `Result for case ${caseId} already recorded as ${existing.status} — left as is.`,
@@ -384,7 +390,7 @@ export async function syncResult(
     );
   }
 
-  const evidence = await syncResultEvidence(projectId, resultId, testCase.id, result);
+  const evidence = await syncResultEvidence(projectId, resultId, testCase.id, result, status);
   return processed(`Result for case ${caseId} → ${status}.${evidence}`);
 }
 
@@ -413,12 +419,48 @@ function newestResult(results: any[], caseId: string | number): any | undefined 
   });
 }
 
+
+/**
+ * Fill in step verdicts Qase never recorded, for a case that passed.
+ *
+ * Qase lets a tester settle a case without touching its steps, and most do:
+ * every step then arrives as status 0, which means "untested", not a verdict.
+ * That leaves a migrated run showing a column of dashes and looking as though
+ * the migration dropped something.
+ *
+ * For a PASSED case it is recoverable — a case passes only if every step
+ * passed, so the step verdicts are *entailed* by the case verdict rather than
+ * invented. FAILED and BLOCKED are not: nothing in the data says which step
+ * broke, and guessing would paint a red mark on steps that were fine.
+ *
+ * Mutates `stepResults` and reports whether anything changed. Entries are
+ * flagged `derivedFrom: "case-result"` so a reader — and the UI — can tell an
+ * inference from something a person actually typed.
+ */
+export function deriveStepVerdicts(
+  caseStatus: string | undefined,
+  stepResults: Record<string, any>,
+  stepIds: string[],
+): boolean {
+  if (caseStatus !== "PASSED" || stepIds.length === 0) return false;
+  // Only when nothing was recorded: a partially stamped case is somebody's
+  // work in progress, and filling the rest would overwrite their intent.
+  if (Object.values(stepResults).some((v: any) => v?.status)) return false;
+
+  for (const id of stepIds) {
+    stepResults[id] = { ...(stepResults[id] || {}), status: "PASSED", derivedFrom: "case-result" };
+  }
+  return true;
+}
+
 /** Copy result-level and step-level attachments. Returns a short suffix for the log. */
 async function syncResultEvidence(
   projectId: string,
   resultId: string,
   caseId: string,
   result: any,
+  /** The case-level verdict, used to fill in steps Qase left untouched. */
+  caseStatus?: string,
 ): Promise<string> {
   // Set by scripts/qase-backfill.ts --skip-attachments, for a fast structural
   // pass over a large project. Never set in the running app.
@@ -457,7 +499,10 @@ async function syncResultEvidence(
   }
 
   const qaseSteps: any[] = Array.isArray(result?.steps) ? result.steps : [];
-  if (qaseSteps.length) {
+  // Also enter for a passed case with no steps from Qase at all: the block
+  // below can still derive the step verdicts from the case result, and Qase
+  // returns `steps: null` often enough that skipping would strand them.
+  if (qaseSteps.length || caseStatus === "PASSED") {
     const ourSteps = await prisma.testStep.findMany({
       where: { caseId },
       orderBy: { position: "asc" },
@@ -504,6 +549,10 @@ async function syncResultEvidence(
       }
       if (existing.length) entry.attachments = existing;
       if (Object.keys(entry).length) stepResults[target.id] = entry;
+    }
+
+    if (deriveStepVerdicts(caseStatus, stepResults, ourSteps.map((x) => x.id))) {
+      changed = true;
     }
 
     if (changed) {

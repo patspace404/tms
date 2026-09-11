@@ -39,9 +39,12 @@ export async function qaseList(resource: string): Promise<any[]> {
     const data = await qaseGet(`${resource}${sep}limit=${limit}&offset=${offset}`);
     const entities: any[] = data?.result?.entities || [];
     out.push(...entities);
-    const total: number = data?.result?.total ?? out.length;
+    // A short page is the last page. `result.total` cannot be trusted for that
+    // decision: on filtered endpoints Qase reports the *unfiltered* count —
+    // `/result/STSD?run=10` answers total 1634 (the whole project) alongside 13
+    // entities — so trusting it costs one wasted request per run, every night.
+    if (entities.length < limit) break;
     offset += limit;
-    if (offset >= total || entities.length === 0) break;
     await new Promise((r) => setTimeout(r, 150)); // be gentle on rate limits
   }
   return out;
