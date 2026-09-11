@@ -21,6 +21,8 @@ type Summary = {
   retestFailed?: number;
   cases?: number;
   passed?: number;
+  failed?: number;
+  casesBlocked?: number;
   executed?: number;
   blocked?: number;
   unblocked?: number;
@@ -79,10 +81,54 @@ function pct(n?: number, d?: number) {
   return d && d > 0 ? `${Math.round(((n || 0) / d) * 100)}%` : "–";
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: string }) {
+/** Test-case health as one bar, in the same colours the dashboard uses. */
+function HealthBar({ s }: { s: Summary }) {
+  const total = s.cases || 0;
+  if (!total) return null;
+  const untested = Math.max(0, total - (s.executed || 0));
+  const seg = [
+    { n: s.passed || 0, cls: "bg-success", label: "ผ่าน" },
+    { n: s.failed || 0, cls: "bg-danger", label: "ไม่ผ่าน" },
+    { n: s.casesBlocked || 0, cls: "bg-warning", label: "ติดบล็อก" },
+  ].filter((x) => x.n > 0);
+  const title = [...seg, { n: untested, label: "ยังไม่ได้เทส" }]
+    .filter((x) => x.n > 0)
+    .map((x) => `${x.label} ${x.n}`)
+    .join(" · ");
+  return (
+    <div className="mt-[14px]" title={title}>
+      <div className="flex h-[6px] overflow-hidden rounded-full bg-surface-2">
+        {seg.map((x, i) => (
+          <i key={i} className={x.cls} style={{ width: `${(x.n / total) * 100}%` }} />
+        ))}
+      </div>
+      <p className="mt-[7px] text-[11.5px] text-text-muted">
+        เทสเคส {total} ใบ · execute {pct(s.executed, total)} · ผ่าน {pct(s.passed, s.executed)}
+        {s.failed ? ` · ไม่ผ่าน ${s.failed}` : ""}
+        {s.casesBlocked ? ` · ติดบล็อก ${s.casesBlocked}` : ""}
+      </p>
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  tone,
+  big,
+}: {
+  label: string;
+  value: string;
+  tone?: string;
+  big?: boolean;
+}) {
   return (
     <div className="flex flex-col gap-[3px]">
-      <span className={`text-[19px] font-medium tabular-nums leading-none ${tone || "text-text-main"}`}>
+      <span
+        className={`font-medium tabular-nums leading-none ${big ? "text-[26px]" : "text-[18px]"} ${
+          tone || "text-text-main"
+        }`}
+      >
         {value}
       </span>
       <span className="text-[11.5px] text-text-muted">{label}</span>
@@ -131,21 +177,22 @@ export default async function MonitorIndex() {
                   <ArrowUpRight className="ml-auto h-4 w-4 shrink-0 text-text-faint transition group-hover:text-text-main" />
                 </div>
 
-                <div className="mt-[14px] grid grid-cols-4 gap-3">
-                  <Stat label="ใบในคิว" value={String(summary.queue ?? "–")} />
-                  <Stat label="พร้อมเทส" value={String(summary.ready ?? "–")} tone="text-success" />
-                  <Stat label="เทสเคสผ่าน" value={pct(summary.passed, summary.executed)} />
-                  <Stat
-                    label="ปลดล็อกแล้ว"
-                    value={String(summary.unblocked ?? 0)}
-                    tone={summary.unblocked ? "text-warning" : undefined}
-                  />
+                <div className="mt-[16px] flex flex-wrap items-end gap-x-7 gap-y-3">
+                  <Stat label={`บั๊ก + ${work} ที่ต้อง verify`} value={String(summary.shown ?? summary.queue ?? "–")} big />
+                  <Stat label="พร้อมหยิบเทส" value={String(summary.ready ?? "–")} tone="text-success" big />
+                  {summary.unblocked ? (
+                    <Stat
+                      label="ปลดล็อกแล้ว รอ retest"
+                      value={String(summary.unblocked)}
+                      tone="text-warning"
+                    />
+                  ) : null}
+                  {summary.retestFailed ? (
+                    <Stat label="retest ไม่ผ่าน" value={String(summary.retestFailed)} tone="text-danger" />
+                  ) : null}
                 </div>
 
-                <p className="mt-3 text-[11.5px] text-text-muted">
-                  ติดตามที่ระดับ {work} · เทสเคส {summary.cases ?? "–"} ใบ · execute{" "}
-                  {pct(summary.executed, summary.cases)} · ติดบล็อก {summary.blocked ?? 0}
-                </p>
+                <HealthBar s={summary} />
 
                 <div className="mt-3 flex items-center gap-1.5 border-t border-border pt-3 text-[11.5px]">
                   <span
@@ -153,6 +200,9 @@ export default async function MonitorIndex() {
                     aria-hidden
                   />
                   <span className={stale ? "text-warning" : "text-text-muted"}>{freshness(ageMinutes)}</span>
+                  {summary.queue ? (
+                    <span className="text-text-faint">· คอลัมน์ READY TO VERIFY {summary.queue} ใบ</span>
+                  ) : null}
                   {stale && (
                     <span className="ml-auto inline-flex items-center gap-1 text-warning">
                       <CircleAlert className="h-3.5 w-3.5" />
