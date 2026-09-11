@@ -464,13 +464,17 @@ async function syncResultEvidence(
 ): Promise<string> {
   // Set by scripts/qase-backfill.ts --skip-attachments, for a fast structural
   // pass over a large project. Never set in the running app.
-  if (process.env.QASE_SYNC_SKIP_ATTACHMENTS === "1") return "";
+  //
+  // It skips *transfers* only. Returning early from the whole function instead
+  // would also skip the step verdicts and the derivation below, which is what
+  // made a --skip-attachments backfill quietly change nothing.
+  const skipTransfers = process.env.QASE_SYNC_SKIP_ATTACHMENTS === "1";
 
   let resultLevel = 0;
   let stepLevel = 0;
   const failures: string[] = [];
 
-  for (const a of result?.attachments || []) {
+  for (const a of skipTransfers ? [] : result?.attachments || []) {
     if (!attachmentSource(a)) continue;
     const name = attachmentName(a);
     const dupe = await prisma.attachment.findFirst({
@@ -534,7 +538,7 @@ async function syncResultEvidence(
       }
 
       const existing: any[] = Array.isArray(entry.attachments) ? entry.attachments : [];
-      for (const a of qs?.attachments || []) {
+      for (const a of skipTransfers ? [] : qs?.attachments || []) {
         if (!attachmentSource(a)) continue;
         const name = attachmentName(a);
         if (existing.some((e) => e?.name === name)) continue;
