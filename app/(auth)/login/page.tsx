@@ -3,30 +3,23 @@
 export const dynamic = "force-dynamic";
 
 import { Suspense, useEffect, useState } from "react";
-import { Inter } from "next/font/google";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, AlertCircle } from "lucide-react";
 import {
-  AuthShell,
-  AuthHeading,
-  AuthOutlineButton,
   AuthBanner,
+  AuthCenteredShell,
+  AuthInkButton,
 } from "@/components/auth/AuthShell";
 
-const inter = Inter({
-  subsets: ["latin"],
-  display: "swap",
-});
-
 /**
- * Microsoft's brand mark. Inlined rather than fetched: the four squares are
- * four rects, and an external image would be one more thing that can fail on
- * the one page a locked-out user needs to work.
+ * Microsoft's brand mark. Inlined rather than fetched: it is four rects, and an
+ * external image would be one more thing that can fail on the one page a
+ * locked-out user needs to work.
  */
 function MicrosoftMark({ size = 18 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 21 21" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 21 21" aria-hidden="true" focusable="false">
       <rect x="1" y="1" width="9" height="9" fill="#F25022" />
       <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
       <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
@@ -50,6 +43,8 @@ function LoginPageContent() {
   const errorCode = searchParams.get("error");
 
   const [loading, setLoading] = useState(false);
+  // null while the provider list is in flight — an enabled button that would do
+  // nothing is worse than a disabled one for the moment it takes to find out.
   const [msEnabled, setMsEnabled] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -59,55 +54,34 @@ function LoginPageContent() {
       .catch(() => setMsEnabled(false));
   }, []);
 
-  const statRow = (
-    <div className="mt-[26px] flex gap-[22px]">
-      {[
-        ["94.2%", "avg pass rate"],
-        ["2,484", "cases tracked"],
-        ["11", "active runs"],
-      ].map(([value, label]) => (
-        <div key={label}>
-          <div className="text-[20px] font-semibold tabular-nums text-white">
-            {value}
-          </div>
-          <div className="text-[11px] text-[var(--neutral-400)]">{label}</div>
-        </div>
-      ))}
-    </div>
-  );
-
   return (
-    <div className={inter.className}>
-      <AuthShell
-        headline="Every test cycle, read at a glance."
-        subtext="Plan, execute and triage with a precision instrument built for QA teams under pressure."
-        brandBottom={statRow}
-      >
-        {/* The logo artwork has a white ground, so it sits in a white tile —
-            deliberate in both themes, and it never punches a hole through the
-            counter of the mark the way keying out the white would. */}
-        <div className="flex justify-center">
-          <div className="flex h-[76px] w-[76px] items-center justify-center rounded-[18px] bg-white shadow-sm ring-1 ring-black/5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/socketnine-logo.jpg"
-              alt="Socket Nine"
-              width={60}
-              height={60}
-              className="h-[60px] w-[60px] object-contain"
-            />
-          </div>
-        </div>
-
-        <AuthHeading
-          title="Welcome back"
-          subtitle="Sign in with your Socket Nine Microsoft account."
+    <AuthCenteredShell>
+      {/* The artwork has a white ground, so it sits in a white tile: deliberate
+          in either theme, and it never punches a hole through the counter of
+          the mark the way keying out the white would. */}
+      <div className="flex h-[72px] w-[72px] items-center justify-center rounded-[20px] bg-white shadow-[var(--shadow-float)] ring-1 ring-black/[0.06] dark:ring-white/10">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/socketnine-logo.jpg"
+          alt="Socket Nine"
+          width={56}
+          height={56}
+          className="h-[56px] w-[56px] object-contain"
         />
+      </div>
 
-        <div className="flex flex-col gap-[18px]">
+      <h1 className="mt-[26px] text-balance text-[25px] font-semibold leading-[1.2] tracking-[-0.02em] text-text-main">
+        Sign in to QMaster
+      </h1>
+      <p className="mt-[8px] text-[14px] leading-[1.55] text-text-muted">
+        Use your Socket Nine Microsoft account.
+      </p>
+
+      {(inviteAccepted || errorCode || msEnabled === false) && (
+        <div className="mt-[24px] flex w-full flex-col gap-[10px] text-left">
           {inviteAccepted && (
             <AuthBanner variant="success" icon={CheckCircle2}>
-              Invitation accepted! You can now sign in.
+              Invitation accepted. You can sign in now.
             </AuthBanner>
           )}
 
@@ -122,33 +96,35 @@ function LoginPageContent() {
               Single sign-on is unavailable right now. Contact your administrator.
             </AuthBanner>
           )}
-
-          <AuthOutlineButton
-            type="button"
-            onClick={() => {
-              setLoading(true);
-              signIn("azure-ad", { callbackUrl: "/" });
-            }}
-            // Null while the provider list is still loading — don't flash an
-            // enabled button that would do nothing if SSO turns out to be off.
-            disabled={!msEnabled || loading}
-            leadingIcon={MicrosoftMark}
-          >
-            {loading ? "Redirecting to Microsoft…" : "Sign in with Microsoft"}
-          </AuthOutlineButton>
-
-          <p className="text-center text-[13px] text-text-muted mt-[-2px]">
-            No account?{" "}
-            <a
-              href="mailto:support@qmaster.app?subject=Workspace%20access%20request"
-              className="font-semibold text-primary hover:text-primary-hover transition-colors"
-            >
-              Request access
-            </a>
-          </p>
         </div>
-      </AuthShell>
-    </div>
+      )}
+
+      <div className="mt-[28px] w-full">
+        <AuthInkButton
+          type="button"
+          onClick={() => {
+            setLoading(true);
+            signIn("azure-ad", { callbackUrl: "/" });
+          }}
+          disabled={!msEnabled}
+          loading={loading}
+          loadingText="Taking you to Microsoft"
+          leadingIcon={MicrosoftMark}
+        >
+          Sign in with Microsoft
+        </AuthInkButton>
+      </div>
+
+      <p className="mt-[20px] text-[13px] text-text-muted">
+        No account?{" "}
+        <a
+          href="mailto:support@qmaster.app?subject=Workspace%20access%20request"
+          className="font-semibold text-primary underline-offset-4 transition-colors hover:text-primary-hover hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-background)] rounded-[3px]"
+        >
+          Request access
+        </a>
+      </p>
+    </AuthCenteredShell>
   );
 }
 

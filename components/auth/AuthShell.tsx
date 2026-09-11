@@ -6,7 +6,11 @@ import { Radar, ArrowRight, type LucideIcon } from "lucide-react";
 /**
  * Two-pane "Instrument" auth layout — graphite brand panel (left) + themed
  * form panel (right). Matches the QMaster visual-language Auth design.
- * Shared by login, signup, forgot/reset password and invite-accept screens.
+ * Shared by signup, forgot/reset password and invite-accept screens.
+ *
+ * Login uses `AuthCenteredShell` instead: once it became a single SSO button
+ * the split had nothing to balance, and a half-empty pane beside a full one
+ * advertises the emptiness rather than framing it.
  */
 export function AuthShell({
   headline,
@@ -82,6 +86,58 @@ export function AuthShell({
   );
 }
 
+
+/**
+ * Single-surface auth layout: one centred column on the app's own background,
+ * with the radar motif behind it as an ambient field rather than a panel.
+ *
+ * A threshold, not a destination — the reader looks at it for a few seconds and
+ * clicks once. So there is no card, no marketing copy and no seam: removing the
+ * last box is what makes the page read as one surface instead of two.
+ */
+export function AuthCenteredShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative min-h-screen w-full overflow-hidden bg-background text-[14px] text-text-main antialiased">
+      {/* Ambient field. Decorative, so it is hidden from assistive tech and
+          never intercepts a click. Light mode needs far less of it than dark
+          before it stops being texture and starts being noise.
+
+          The radial mask is the point: without it the rings run straight
+          through the heading and the page reads busy rather than calm. Fading
+          the centre out leaves texture at the edges and clean paper where the
+          words are. */}
+      <svg
+        style={{
+          maskImage:
+            "radial-gradient(closest-side, transparent 34%, rgba(0,0,0,0.55) 58%, #000 100%)",
+          WebkitMaskImage:
+            "radial-gradient(closest-side, transparent 34%, rgba(0,0,0,0.55) 58%, #000 100%)",
+        }}
+        className="pointer-events-none absolute left-1/2 top-1/2 h-[860px] w-[860px] -translate-x-1/2 -translate-y-1/2 opacity-[0.16] dark:opacity-[0.34]"
+        viewBox="0 0 560 560"
+        fill="none"
+        aria-hidden="true"
+        focusable="false"
+      >
+        <circle cx="280" cy="280" r="90" stroke="var(--blue-500)" strokeWidth="1" />
+        <circle cx="280" cy="280" r="150" stroke="var(--blue-500)" strokeWidth="1" strokeOpacity=".6" />
+        <circle cx="280" cy="280" r="220" stroke="var(--blue-500)" strokeWidth="1" strokeOpacity=".35" />
+        <circle cx="280" cy="280" r="290" stroke="var(--blue-500)" strokeWidth="1" strokeOpacity=".18" />
+        <line x1="280" y1="0" x2="280" y2="560" stroke="var(--blue-500)" strokeWidth="1" strokeOpacity=".2" />
+        <line x1="0" y1="280" x2="560" y2="280" stroke="var(--blue-500)" strokeWidth="1" strokeOpacity=".2" />
+        <path d="M280 280 L470 170" stroke="var(--blue-400)" strokeWidth="2" />
+        <circle cx="470" cy="170" r="5" fill="var(--blue-400)" />
+      </svg>
+
+      <main className="relative flex min-h-screen items-center justify-center px-6 py-16">
+        <div className="flex w-full max-w-[352px] flex-col items-center text-center">
+          {children}
+        </div>
+      </main>
+    </div>
+  );
+}
+
 /** Small uppercase eyebrow above a form heading (matches the design). */
 export function AuthEyebrow({ children }: { children: React.ReactNode }) {
   return (
@@ -150,6 +206,49 @@ const spinner = (
     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
   </svg>
 );
+
+/**
+ * Full-width neutral-ink button — same geometry as the primary and outline
+ * buttons, only the fill differs, so the auth surfaces keep one button
+ * vocabulary.
+ *
+ * Ink rather than the blue primary because its only use is "Sign in with
+ * Microsoft": the blue would fight the four-colour Microsoft mark sitting
+ * inside it, and ink inverts per theme into the two treatments Microsoft
+ * actually sanctions — near-black on light, white on dark.
+ */
+export function AuthInkButton({
+  loading,
+  loadingText,
+  leadingIcon: Leading,
+  children,
+  ...rest
+}: {
+  loading?: boolean;
+  loadingText?: string;
+  leadingIcon?: React.ComponentType<{ size?: number }>;
+  children: React.ReactNode;
+} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      {...rest}
+      disabled={loading || rest.disabled}
+      className="flex h-[46px] w-full items-center justify-center gap-[10px] rounded-[12px] bg-[var(--neutral-950)] px-4 text-[15px] font-semibold text-white shadow-[var(--shadow-sm)] transition-[background-color,box-shadow,transform] duration-150 ease-out hover:bg-[var(--neutral-800)] hover:shadow-[var(--shadow-md)] active:translate-y-px active:shadow-[var(--shadow-sm)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-background)] disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:bg-[var(--neutral-950)] disabled:hover:shadow-[var(--shadow-sm)] disabled:active:translate-y-0 motion-reduce:transition-none motion-reduce:active:translate-y-0 dark:bg-[var(--neutral-50)] dark:text-[var(--neutral-950)] dark:hover:bg-white dark:disabled:hover:bg-[var(--neutral-50)]"
+    >
+      {loading ? (
+        <>
+          {spinner}
+          {loadingText || "Please wait"}
+        </>
+      ) : (
+        <>
+          {Leading && <Leading size={18} />}
+          {children}
+        </>
+      )}
+    </button>
+  );
+}
 
 /** Full-width primary submit button (44px, matches the design). */
 export function AuthPrimaryButton({
