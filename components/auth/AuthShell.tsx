@@ -194,7 +194,9 @@ export function AuthOutlineButton({
   children,
   ...rest
 }: {
-  leadingIcon?: LucideIcon;
+  /** Any icon that takes a `size` — a Lucide icon, or a brand mark such as
+      the Microsoft squares on the login page. */
+  leadingIcon?: React.ComponentType<{ size?: number }>;
   children: React.ReactNode;
 } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
