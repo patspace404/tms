@@ -46,6 +46,7 @@ import { createRoot } from "react-dom/client";
 import { PdfReportTemplate } from "./PdfReportTemplate";
 import { Button } from "@/components/ui/Button";
 import { formatThaiTime } from "@/lib/utils";
+import { displayNameOf, initialsOf } from "@/lib/initials";
 
 const AVATAR_COLORS = [
   "#4f46e5",
@@ -60,11 +61,8 @@ const AVATAR_COLORS = [
 function userMeta(
   user: { name?: string | null; email?: string | null } | null | undefined,
 ) {
-  const display = user?.name || user?.email?.split("@")[0] || "Unknown";
-  const parts = display.split(" ");
-  const initials = (
-    parts.length >= 2 ? `${parts[0][0]}${parts[1][0]}` : display.substring(0, 2)
-  ).toUpperCase();
+  const display = displayNameOf(user?.name, user?.email);
+  const initials = initialsOf(user?.name, user?.email);
   let sum = 0;
   for (let i = 0; i < display.length; i++) sum += display.charCodeAt(i);
   return {

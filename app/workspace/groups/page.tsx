@@ -19,6 +19,7 @@ import {
   Building2,
   type LucideIcon,
 } from "lucide-react";
+import { displayNameOf, initialsOf } from "@/lib/initials";
 
 const GROUP_ICONS: LucideIcon[] = [ShoppingCart, CreditCard, Network, Flag, Building2];
 
@@ -61,11 +62,8 @@ const TEXT_COLORS = [
 ];
 
 function avatarMeta(u: { name?: string | null; email: string }, idx: number) {
-  const display = u.name || u.email.split("@")[0];
-  const parts = display.split(" ");
-  const initials = (
-    parts.length >= 2 ? `${parts[0][0]}${parts[1][0]}` : display.substring(0, 2)
-  ).toUpperCase();
+  const display = displayNameOf(u.name, u.email);
+  const initials = initialsOf(u.name, u.email);
   return {
     display,
     initials,

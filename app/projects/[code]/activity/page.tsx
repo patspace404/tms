@@ -15,6 +15,7 @@ import {
   PlusCircle,
   type LucideIcon,
 } from "lucide-react";
+import { initialsOf } from "@/lib/initials";
 
 type AuditLog = {
   id: string;
@@ -56,11 +57,8 @@ function avatarInfo(name: string) {
   for (const c of name) n += c.charCodeAt(0);
   const colorSet = AVS[n % AVS.length];
   
-  const p = name.trim().split(" ");
-  const initials = p.length >= 2
-    ? (p[0][0] + p[p.length - 1][0]).toUpperCase()
-    : name.slice(0, 2).toUpperCase();
-    
+  const initials = initialsOf(name);
+  
   return { ...colorSet, initials };
 }
 

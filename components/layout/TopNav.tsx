@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { ChevronDown, Search, User, LogOut, Radar, KeyRound } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CommandPalette } from "@/components/ui/CommandPalette";
+import { initialsOf } from "@/lib/initials";
 
 const NAV_LINKS = [
   { name: "Projects", href: "/projects" },
@@ -45,15 +46,9 @@ export function TopNav() {
     return () => window.removeEventListener("workspace-logo-updated", onUpdate);
   }, []);
 
-  const getInitials = (name?: string | null) => {
-    if (!name) return "?";
-    // If it looks like an email, use the part before @
-    const display = name.includes("@") ? name.split("@")[0] : name;
-    const p = display.split(" ").filter(Boolean);
-    return p.length >= 2
-      ? `${p[0][0]}${p[1][0]}`.toUpperCase()
-      : display.slice(0, 2).toUpperCase();
-  };
+  // An email may arrive in the name slot; initialsOf takes it as the fallback.
+  const getInitials = (name?: string | null) =>
+    name?.includes("@") ? initialsOf(null, name) : initialsOf(name);
 
   return (
     <header className="relative z-50 w-full shrink-0 bg-surface border-b border-border">

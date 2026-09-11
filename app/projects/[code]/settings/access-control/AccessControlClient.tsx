@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Globe, Lock, Users, Search, Loader2, Check, Plus, Minus, User } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { initialsOf } from "@/lib/initials";
 
 interface Owner {
   id?: string;
@@ -49,11 +50,8 @@ function avatarInfo(name: string) {
   for (const c of name) n += c.charCodeAt(0);
   const colorSet = AVS[n % AVS.length];
   
-  const p = name.trim().split(" ");
-  const initials = p.length >= 2
-    ? (p[0][0] + p[p.length - 1][0]).toUpperCase()
-    : name.slice(0, 2).toUpperCase();
-    
+  const initials = initialsOf(name);
+  
   return { ...colorSet, initials };
 }
 

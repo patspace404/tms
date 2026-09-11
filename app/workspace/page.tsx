@@ -3,13 +3,10 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { canManageWorkspace } from "@/lib/permissions";
 import UsersTable from "@/components/workspace/UsersTable";
+import { initialsOf } from "@/lib/initials";
 
 function getInitials(name: string | null) {
-  if (!name) return "U";
-  const parts = name.split(" ").filter(Boolean);
-  return parts.length >= 2
-    ? `${parts[0][0]}${parts[1][0]}`.toUpperCase()
-    : name.substring(0, 2).toUpperCase();
+  return name ? initialsOf(name) : "U";
 }
 
 // Deterministic vibrant avatar color from name

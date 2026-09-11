@@ -29,6 +29,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ProjectDashboardFilters } from "./ProjectDashboardFilters";
 import { runStats } from "@/lib/run-stats";
+import { initialsOf } from "@/lib/initials";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -1256,7 +1257,7 @@ export default async function ProjectDashboardPage({
                 return (
                   <div key={i} className="flex items-center gap-[10px]">
                     <div className="flex h-[28px] w-[28px] shrink-0 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: avBg, color: avColor }}>
-                      {c.name.split(" ").map((x) => x[0]).join("").slice(0, 2)}
+                      {initialsOf(c.name)}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-[12.5px] font-medium">{c.name}</div>

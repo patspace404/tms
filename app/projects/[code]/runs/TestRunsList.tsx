@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useProjectRole } from "@/components/providers/ProjectRoleProvider";
 import { runStats } from "@/lib/run-stats";
+import { displayNameOf, initialsOf } from "@/lib/initials";
 
 // Color thresholds mirror the design's <script> data shaping.
 // Ring + completion bar use raw CSS vars (needed in SVG stroke / inline style).
@@ -46,11 +47,8 @@ const AVATAR_COLORS = [
 function authorMeta(
   author: { name?: string | null; email?: string | null } | null | undefined,
 ) {
-  const display = author?.name || author?.email?.split("@")[0] || "Unknown";
-  const parts = display.split(" ");
-  const initials = (
-    parts.length >= 2 ? `${parts[0][0]}${parts[1][0]}` : display.substring(0, 2)
-  ).toUpperCase();
+  const display = displayNameOf(author?.name, author?.email);
+  const initials = initialsOf(author?.name, author?.email);
   let sum = 0;
   for (let i = 0; i < display.length; i++) sum += display.charCodeAt(i);
   return {
