@@ -632,6 +632,24 @@ export default function RunExecutionClient({
   };
 
   const [isReopening, setIsReopening] = useState(false);
+  const [isAborting, setIsAborting] = useState(false);
+  const handleAbortRun = async () => {
+    setIsAborting(true);
+    try {
+      const res = await fetch(`/api/runs/${runId}/abort`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to abort run");
+      }
+      toast.success("Run aborted");
+      router.refresh();
+    } catch (e: any) {
+      toast.error("Error aborting run: " + (e.message || e));
+    } finally {
+      setIsAborting(false);
+    }
+  };
+
   const handleReopenRun = async () => {
     setIsReopening(true);
     try {
@@ -1701,6 +1719,9 @@ export default function RunExecutionClient({
                   <button onClick={() => { setMainMenuOpen(false); setIsExportModalOpen(true); }} className="w-full text-left px-4 py-2 text-[13px] hover:bg-surface-hover flex items-center gap-2"><FileText size={14} className="text-text-muted" /> Export (PDF / CSV)</button>
                   {failedCount > 0 && <button onClick={handleRerunFailed} disabled={isRerunning} className="w-full text-left px-4 py-2 text-[13px] hover:bg-surface-hover flex items-center gap-2"><RotateCcw size={14} className="text-text-muted" /> {isRerunning ? "Re-running…" : `Re-run failed (${failedCount})`}</button>}
                   <div className="h-px bg-border my-1" />
+                  {run.status === "ACTIVE" && (
+                    <button onClick={() => { setMainMenuOpen(false); handleAbortRun(); }} disabled={isAborting} className="w-full text-left px-4 py-2 text-[13px] hover:bg-surface-hover flex items-center gap-2 disabled:opacity-60"><Ban size={14} className="text-text-muted" /> {isAborting ? "Aborting…" : "Abort run"}</button>
+                  )}
                   {run.status === "ACTIVE" ? (
                     <button onClick={() => { setMainMenuOpen(false); setIsCompleteModalOpen(true); }} className="w-full text-left px-4 py-2 text-[13px] hover:bg-surface-hover flex items-center gap-2"><CheckCircle2 size={14} className="text-text-muted" /> Complete run</button>
                   ) : (

@@ -16,6 +16,7 @@ import {
   XCircle,
   Ban,
   SkipForward,
+  RotateCcw,
 } from "lucide-react";
 import { useProjectRole } from "@/components/providers/ProjectRoleProvider";
 import { runStats } from "@/lib/run-stats";
@@ -90,6 +91,30 @@ export function TestRunsList({ initialRuns, code }: TestRunsListProps) {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const handleStatusChange = async (runId: string, status: "ABORTED" | "ACTIVE") => {
+    setActiveDropdown(null);
+    const previous = runs;
+    // Move the card between columns straight away; the board is the feedback.
+    setRuns((prev: any[]) => prev.map((r) => (r.id === runId ? { ...r, status } : r)));
+    try {
+      // Same verb routes the runner page uses, so both screens move a run
+      // through its lifecycle the same way.
+      const res = await fetch(
+        `/api/runs/${runId}/${status === "ABORTED" ? "abort" : "reopen"}`,
+        { method: "POST" },
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to update the run");
+      }
+      toast.success(status === "ABORTED" ? "Run aborted" : "Run reopened");
+      router.refresh();
+    } catch (err) {
+      setRuns(previous);
+      toast.error(err instanceof Error ? err.message : "Failed to update the run");
+    }
+  };
 
   const handleDelete = async (runId: string) => {
     const backup = [...runs];
@@ -262,6 +287,16 @@ export function TestRunsList({ initialRuns, code }: TestRunsListProps) {
               <Link href={`/projects/${code}/runs/${run.id}`} className="w-full text-left px-4 py-2 text-[13px] text-text-main hover:bg-surface-hover flex items-center">
                 <Play size={13} className="mr-2 text-text-muted" /> Open run
               </Link>
+              {role !== "VIEWER" && run.status === "ACTIVE" && (
+                <button onClick={() => handleStatusChange(run.id, "ABORTED")} className="w-full text-left px-4 py-2 text-[13px] text-text-main hover:bg-surface-hover flex items-center">
+                  <Ban size={13} className="mr-2 text-text-muted" /> Abort run
+                </button>
+              )}
+              {role !== "VIEWER" && run.status !== "ACTIVE" && (
+                <button onClick={() => handleStatusChange(run.id, "ACTIVE")} className="w-full text-left px-4 py-2 text-[13px] text-text-main hover:bg-surface-hover flex items-center">
+                  <RotateCcw size={13} className="mr-2 text-text-muted" /> Reopen run
+                </button>
+              )}
               <button onClick={() => { setActiveDropdown(null); setConfirmDeleteId(run.id); }} className="w-full text-left px-4 py-2 text-[13px] text-danger hover:bg-danger-soft flex items-center">
                 <Trash2 size={13} className="mr-2" /> Delete run
               </button>
