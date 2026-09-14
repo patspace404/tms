@@ -142,6 +142,48 @@ export async function syncSuite(
   return processed(`Created suite "${s.title}".`);
 }
 
+/**
+ * Attach suites that should sit under a parent but ended up at the root.
+ *
+ * `syncSuite` can only set `parentId` at creation, so a child that arrives
+ * before its parent is stranded — and re-running the sync does not help,
+ * because the child now "already exists" and returns before the parent is ever
+ * considered. PKL had 19 suites stuck at the root this way; the other ten
+ * projects escaped it only because the original migration script wired parents
+ * in a second pass of its own.
+ *
+ * Takes the suite list the caller already fetched, so repairing costs no extra
+ * Qase calls. Only ever fills an *empty* parent: a suite someone deliberately
+ * moved in QMaster keeps its place, and so does one Qase re-parented, since
+ * that is an update and this sync does not do updates.
+ */
+export async function relinkOrphanSuites(
+  projectId: string,
+  qaseSuites: any[],
+): Promise<number> {
+  const ours = await prisma.testSuite.findMany({
+    where: { projectId },
+    select: { id: true, externalId: true, parentId: true },
+  });
+  const byExternalId = new Map(
+    ours.filter((s) => s.externalId).map((s) => [s.externalId as string, s]),
+  );
+
+  let fixed = 0;
+  for (const s of qaseSuites) {
+    if (!s?.parent_id) continue;
+    const mine = byExternalId.get(String(s.id));
+    if (!mine || mine.parentId) continue; // present and already placed
+    const parent = byExternalId.get(String(s.parent_id));
+    if (!parent || parent.id === mine.id) continue;
+
+    await prisma.testSuite.update({ where: { id: mine.id }, data: { parentId: parent.id } });
+    mine.parentId = parent.id;
+    fixed++;
+  }
+  return fixed;
+}
+
 // ── cases ──────────────────────────────────────────────────────────────
 
 export async function syncCase(

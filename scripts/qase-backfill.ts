@@ -33,7 +33,14 @@
 
 import { prisma } from "@/lib/prisma";
 import { qaseList } from "@/lib/qase/client";
-import { syncCase, syncResult, syncRun, syncSuite, type SyncOutcome } from "@/lib/qase/sync";
+import {
+  relinkOrphanSuites,
+  syncCase,
+  syncResult,
+  syncRun,
+  syncSuite,
+  type SyncOutcome,
+} from "@/lib/qase/sync";
 
 const arg = (name: string) =>
   process.argv.find((a) => a.startsWith(`--${name}=`))?.split("=")[1];
@@ -97,15 +104,14 @@ async function backfillProject(projectId: string, code: string, qaseCode: string
   const qaseSuites = await qaseList(`/suite/${qaseCode}`);
   log(`  suites in Qase: ${qaseSuites.length}`);
   if (!DRY_RUN) {
-    // Two passes so a child created before its parent still gets linked: the
-    // first pass creates everything, the second re-runs and now finds parents.
-    for (const pass of [1, 2]) {
-      for (const s of qaseSuites) {
-        const out = await guard(() => syncSuite(projectId, qaseCode, s.id));
-        if (pass === 1) record(suites, out, `suite ${s.id}`);
-      }
-      if (suites.created === 0) break; // nothing new — a second pass changes nothing
+    for (const s of qaseSuites) {
+      record(suites, await guard(() => syncSuite(projectId, qaseCode, s.id)), `suite ${s.id}`);
     }
+    // Then place the ones whose parent did not exist yet when they were made.
+    // A second pass of syncSuite cannot do this: those suites now exist, so it
+    // returns before it ever looks at the parent.
+    const relinked = await relinkOrphanSuites(projectId, qaseSuites);
+    if (relinked) log(`   ↳ re-parented ${relinked} orphaned suite(s)`);
   }
 
   // ── cases ──
