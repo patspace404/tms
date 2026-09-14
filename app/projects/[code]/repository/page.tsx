@@ -40,7 +40,8 @@ export default async function RepositoryPage({
           author: { select: { name: true, email: true } },
           linkedIssues: { orderBy: { createdAt: "desc" } },
         },
-        orderBy: { createdAt: "desc" },
+        // Cases read in the order they are numbered: PKL-1, PKL-2, PKL-3.
+        orderBy: { sequenceNumber: "asc" },
       });
     }
   } catch (err) {

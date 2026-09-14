@@ -1132,25 +1132,52 @@ export default function RunExecutionClient({
     }
   };
 
-  const handleFileUpload = async (stepId: string, file: File) => {
-    if (!file) return;
+  /**
+   * Attach one or more files to a step.
+   *
+   * The upload endpoint takes a single file, so this posts them one at a time —
+   * but it appends to the step only once, at the end. Appending per file would
+   * read `stepResults` from a stale closure on every call after the first, so
+   * each upload would overwrite the last and only one screenshot would survive.
+   *
+   * A file that fails is named rather than swallowed, and the ones that
+   * succeeded are still kept.
+   */
+  const handleFileUpload = async (stepId: string, files: File | File[]) => {
+    const list = (Array.isArray(files) ? files : [files]).filter(Boolean);
+    if (list.length === 0) return;
+
     setUploadingStepId(stepId);
+    const uploaded: { url: string; name: string }[] = [];
+    const failed: string[] = [];
+
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("projectId", projectCode);
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-      if (!res.ok) throw new Error("Upload failed");
-      const data = await res.json();
-      const currentAtts = stepResults[stepId]?.attachments || [];
-      const newAtts = [...currentAtts, { url: data.url, name: file.name }];
-      updateStepResult(stepId, { attachments: newAtts });
-    } catch (error) {
-      console.error(error);
-      toast.error("Failed to upload file");
+      for (const file of list) {
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("projectId", projectCode);
+          const res = await fetch("/api/upload", { method: "POST", body: formData });
+          if (!res.ok) throw new Error("Upload failed");
+          const data = await res.json();
+          uploaded.push({ url: data.url, name: file.name });
+        } catch (error) {
+          console.error(error);
+          failed.push(file.name);
+        }
+      }
+
+      if (uploaded.length > 0) {
+        const currentAtts = stepResults[stepId]?.attachments || [];
+        updateStepResult(stepId, { attachments: [...currentAtts, ...uploaded] });
+      }
+      if (failed.length > 0) {
+        toast.error(
+          failed.length === 1
+            ? `Could not upload ${failed[0]}`
+            : `Could not upload ${failed.length} files: ${failed.slice(0, 3).join(", ")}`,
+        );
+      }
     } finally {
       setUploadingStepId(null);
     }
@@ -1162,16 +1189,15 @@ export default function RunExecutionClient({
   ) => {
     const items = e.clipboardData?.items;
     if (!items) return;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf("image") !== -1) {
-        const file = items[i].getAsFile();
-        if (file) {
-          e.preventDefault();
-          handleFileUpload(stepId, file);
-          break;
-        }
-      }
-    }
+    // Take every image on the clipboard, not just the first: pasting a pair of
+    // screenshots used to silently drop one.
+    const files = Array.from(items)
+      .filter((item) => item.type.startsWith("image"))
+      .map((item) => item.getAsFile())
+      .filter((f): f is File => Boolean(f));
+    if (files.length === 0) return;
+    e.preventDefault();
+    handleFileUpload(stepId, files);
   };
 
   const getStatusColor = (status: string) => {
@@ -1954,7 +1980,7 @@ export default function RunExecutionClient({
                                 ))}
                               </div>
                             )}
-                            <input type="file" id={`file-upload-${step.id}`} className="hidden" accept="image/*,video/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) { handleFileUpload(step.id, file); e.target.value = ""; } }} />
+                            <input type="file" id={`file-upload-${step.id}`} className="hidden" multiple accept="image/*,video/*,.txt,.log,.json,.har,.csv" onChange={(e) => { const files = Array.from(e.target.files || []); if (files.length) { handleFileUpload(step.id, files); } e.target.value = ""; }} />
                             <label htmlFor={`file-upload-${step.id}`} className="flex items-center justify-center gap-1.5 py-1.5 border border-dashed border-border hover:border-primary bg-surface-hover hover:bg-surface rounded-md text-[11px] font-semibold text-text-faint hover:text-primary cursor-pointer transition w-full">
                               <ImageIcon size={13} /> <span>Upload screenshot / log</span>
                               {uploadingStepId === step.id && <RefreshCw size={12} className="animate-spin" />}

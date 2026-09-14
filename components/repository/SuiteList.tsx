@@ -17,9 +17,54 @@ import {
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
   Check,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { useSuiteSelection } from "@/components/providers/SuiteSelectionProvider";
 import { useProjectRole } from "@/components/providers/ProjectRoleProvider";
+import {
+  compareCases,
+  ownerLabel,
+  typeLabelOf,
+  type CaseSortDir,
+  type CaseSortKey,
+} from "@/lib/case-sort";
+
+// priority arrow icon (high / medium / low / not set)
+const getPriIcon = (pri?: string) => {
+  switch ((pri || "").toUpperCase()) {
+    case "HIGH":
+      return { Icon: ChevronsUp, color: "var(--danger)" };
+    case "MEDIUM":
+      return { Icon: Minus, color: "var(--warning)" };
+    case "LOW":
+      return { Icon: ChevronDown, color: "var(--text-faint)" };
+    default:
+      return { Icon: Minus, color: "var(--text-faint)" };
+  }
+};
+
+const getTypeMeta = (tc: any) => {
+  const label = typeLabelOf(tc);
+  const Icon =
+    label === "Negative"
+      ? Ban
+      : label === "Visual"
+        ? Eye
+        : label === "Automated"
+          ? Bot
+          : FunctionSquare;
+  return { Icon, label };
+};
+
+const ownerInitials = (tc: any) => {
+  const src = ownerLabel(tc);
+  if (!src) return "U";
+  const parts = String(src).trim().split(/[\s@.]+/).filter(Boolean);
+  if (parts.length >= 2)
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  return String(src).substring(0, 2).toUpperCase();
+};
 
 interface SuiteListProps {
   suites: any[];
@@ -59,6 +104,47 @@ export function SuiteList({
 }: SuiteListProps) {
   const { selectedCases, toggleCase, toggleSuiteCases, clearSelection } =
     useSuiteSelection();
+
+  // Cases read in numeric order by default — the order people wrote them in.
+  const [sort, setSort] = useState<{ key: CaseSortKey; dir: CaseSortDir }>({
+    key: "id",
+    dir: "asc",
+  });
+  const toggleSort = (key: CaseSortKey) =>
+    setSort((prev) =>
+      prev.key === key
+        ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { key, dir: "asc" },
+    );
+
+  /**
+   * A column header you can sort by. The arrow only shows on the active column
+   * — or faintly on hover, so the rest of the row still reads as a header
+   * rather than a bank of buttons.
+   */
+  const sortHeader = (label: React.ReactNode, key: CaseSortKey, extra = "", srLabel?: string) => {
+    const active = sort.key === key;
+    const Arrow = active && sort.dir === "desc" ? ArrowDown : ArrowUp;
+    return (
+      <button
+        type="button"
+        onClick={() => toggleSort(key)}
+        aria-label={srLabel ? `Sort by ${srLabel}` : undefined}
+        title={`Sort by ${srLabel ?? String(label)}`}
+        aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+        className={`group flex items-center gap-[3px] rounded-[4px] transition-colors hover:text-text-main focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] ${
+          active ? "text-text-main" : ""
+        } ${extra}`}
+      >
+        {label}
+        <Arrow
+          size={11}
+          strokeWidth={2.5}
+          className={active ? "opacity-100" : "opacity-0 transition-opacity group-hover:opacity-40"}
+        />
+      </button>
+    );
+  };
   const { role } = useProjectRole();
   const [page, setPage] = useState(1);
 
@@ -85,7 +171,7 @@ export function SuiteList({
       activeCases = cases.filter((tc) => allowedSuiteIds.has(tc.suiteId));
     }
 
-    return activeCases.filter((tc) => {
+    const matched = activeCases.filter((tc) => {
       // Text search
       if (q) {
         const title = (tc.title || "").toLowerCase();
@@ -111,6 +197,8 @@ export function SuiteList({
         return false;
       return true;
     });
+
+    return [...matched].sort((a, b) => compareCases(a, b, sort.key, sort.dir));
   }, [
     cases,
     activeSuiteId,
@@ -120,6 +208,7 @@ export function SuiteList({
     searchScope,
     priorityFilter,
     automationFilter,
+    sort,
   ]);
 
   const isFiltering =
@@ -128,7 +217,7 @@ export function SuiteList({
   // Reset to page 1 when the result set changes
   React.useEffect(() => {
     setPage(1);
-  }, [activeSuiteId, q, priorityFilter, automationFilter]);
+  }, [activeSuiteId, q, priorityFilter, automationFilter, sort]);
 
   const totalPages = Math.max(1, Math.ceil(displayCases.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -149,43 +238,6 @@ export function SuiteList({
   // Qase-style dense table: check · priority · type · ID · TITLE · TAGS · TYPE · OWNER
   const GRID =
     "30px 24px 24px 84px minmax(0,1fr) 150px 112px 56px";
-
-  // priority arrow icon (high / medium / low / not set)
-  const getPriIcon = (pri?: string) => {
-    switch ((pri || "").toUpperCase()) {
-      case "HIGH":
-        return { Icon: ChevronsUp, color: "var(--danger)" };
-      case "MEDIUM":
-        return { Icon: Minus, color: "var(--warning)" };
-      case "LOW":
-        return { Icon: ChevronDown, color: "var(--text-faint)" };
-      default:
-        return { Icon: Minus, color: "var(--text-faint)" };
-    }
-  };
-
-  const getTypeMeta = (tc: any) => {
-    const t = (tc.type || "").toUpperCase();
-    if (t === "NEGATIVE") return { Icon: Ban, label: "Negative" };
-    if (t === "VISUAL") return { Icon: Eye, label: "Visual" };
-    if (tc.automationStatus === "AUTOMATED")
-      return { Icon: Bot, label: "Automated" };
-    return { Icon: FunctionSquare, label: tc.type ? "Functional" : "Manual" };
-  };
-
-  const ownerInitials = (tc: any) => {
-    const src =
-      tc.assignee?.name ||
-      tc.assignee?.email ||
-      tc.author?.name ||
-      tc.assigneeId ||
-      "";
-    if (!src) return "U";
-    const parts = String(src).trim().split(/[\s@.]+/).filter(Boolean);
-    if (parts.length >= 2)
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    return String(src).substring(0, 2).toUpperCase();
-  };
 
   return (
     <div className="flex flex-col min-w-0 h-full">
@@ -270,13 +322,15 @@ export function SuiteList({
             </button>
           )}
         </div>
+        <div className="flex justify-center">
+          {sortHeader(<ChevronsUp size={13} />, "priority", "", "priority")}
+        </div>
         <div></div>
-        <div></div>
-        <div>ID</div>
-        <div>Title</div>
+        <div>{sortHeader("ID", "id")}</div>
+        <div>{sortHeader("Title", "title")}</div>
         <div>Tags</div>
-        <div>Type</div>
-        <div className="text-right">Owner</div>
+        <div>{sortHeader("Type", "type")}</div>
+        <div className="flex justify-end">{sortHeader("Owner", "owner")}</div>
       </div>
 
       {/* rows */}

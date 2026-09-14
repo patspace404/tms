@@ -171,7 +171,8 @@ export async function GET(
   const cases = await prisma.testCase.findMany({
     where: whereClause,
     include: { steps: true, tags: true, attachments: true },
-    orderBy: { createdAt: "desc" },
+    // Cases read in the order they are numbered: PKL-1, PKL-2, PKL-3.
+    orderBy: { sequenceNumber: "asc" },
   });
   return NextResponse.json(cases);
 }
