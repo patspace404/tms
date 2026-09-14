@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 
 import { logAudit } from "@/lib/audit-logger";
+import { softDeleteCases } from "@/lib/case-delete";
 
 export async function DELETE(
   req: Request,
@@ -36,18 +37,10 @@ export async function DELETE(
       );
     }
 
-    // Delete the test case
-    await prisma.testCase.delete({
-      where: { id: caseId },
-    });
-
-    await logAudit({
-      projectId: project.id,
+    // Trash, not destroy — and the audit entry is written by the helper so
+    // every delete path records the same thing.
+    await softDeleteCases(project.id, [caseId], {
       userId: (session.user as any).id,
-      action: "DELETED",
-      entity: "TEST_CASE",
-      entityId: caseId,
-      details: `Deleted Test Case: ${testCase.title}`,
     });
 
     return NextResponse.json({ success: true });

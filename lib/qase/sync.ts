@@ -27,7 +27,7 @@
 
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import * as crypto from "crypto";
-import { prisma } from "@/lib/prisma";
+import { prisma, prismaRaw } from "@/lib/prisma";
 import { s3Client, S3_BUCKET } from "@/lib/s3";
 import { qaseEntity, qaseList } from "./client";
 import {
@@ -192,10 +192,14 @@ export async function syncCase(
   caseId: string | number,
 ): Promise<SyncOutcome> {
   const externalId = String(caseId);
-  const existing = await prisma.testCase.findFirst({
+  // The raw client on purpose: a case someone moved to the trash is hidden
+  // from the normal one, and re-creating it every night would make the trash
+  // useless — the delete has to stick until someone restores or purges it.
+  const existing = await prismaRaw.testCase.findFirst({
     where: { projectId, externalId },
-    select: { id: true },
+    select: { id: true, deletedAt: true },
   });
+  if (existing?.deletedAt) return skipped(`Case ${externalId} is in the trash — left there.`);
   if (existing) return skipped(`Case ${externalId} already exists.`);
 
   const c = await qaseEntity(`/case/${qaseProjectCode}/${externalId}`);

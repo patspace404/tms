@@ -10,6 +10,11 @@ const prismaMock = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 
+const softDeleteCasesMock = vi.hoisted(() => vi.fn());
+// The route delegates the delete; soft-delete semantics live in
+// tests/unit/soft-delete-cases.test.ts.
+vi.mock("@/lib/case-delete", () => ({ softDeleteCases: softDeleteCasesMock }));
+
 const requireProjectRoleMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/project-auth", () => ({ requireProjectRole: requireProjectRoleMock }));
 
@@ -93,7 +98,7 @@ describe("DELETE /api/projects/[code]/cases/bulk", () => {
     prismaMock.project.findFirst.mockResolvedValue({ id: "proj1", code: "TEST" });
     sessionMock.getServerSession.mockResolvedValue({ user: { id: "user1", role: "MEMBER" } });
     requireProjectRoleMock.mockResolvedValue(true);
-    prismaMock.testCase.deleteMany.mockResolvedValue({ count: 2 });
+    softDeleteCasesMock.mockResolvedValue(2);
 
     const res = await DELETE(makeRequest({ caseIds: ["id1", "id2"] }), makeParams("TEST"));
     const json = await res.json();
@@ -101,8 +106,9 @@ describe("DELETE /api/projects/[code]/cases/bulk", () => {
     expect(res.status).toBe(200);
     expect(json.success).toBe(true);
     expect(json.count).toBe(2);
-    expect(prismaMock.testCase.deleteMany).toHaveBeenCalledWith({
-      where: { id: { in: ["id1", "id2"] }, projectId: "proj1" },
+    // Scoped to the project, attributed to the caller, and reversible.
+    expect(softDeleteCasesMock).toHaveBeenCalledWith("proj1", ["id1", "id2"], {
+      userId: "user1",
     });
   });
 
@@ -110,7 +116,7 @@ describe("DELETE /api/projects/[code]/cases/bulk", () => {
     prismaMock.project.findFirst.mockResolvedValue({ id: "proj1", code: "TEST" });
     sessionMock.getServerSession.mockResolvedValue({ user: { id: "admin1", role: "ADMIN" } });
     requireProjectRoleMock.mockResolvedValue(false);
-    prismaMock.testCase.deleteMany.mockResolvedValue({ count: 1 });
+    softDeleteCasesMock.mockResolvedValue(1);
 
     const res = await DELETE(makeRequest({ caseIds: ["id1"] }), makeParams("TEST"));
     const json = await res.json();
@@ -119,11 +125,11 @@ describe("DELETE /api/projects/[code]/cases/bulk", () => {
     expect(json.success).toBe(true);
   });
 
-  it("returns 400 when deleteMany throws an unexpected error", async () => {
+  it("returns 400 when the delete throws an unexpected error", async () => {
     prismaMock.project.findFirst.mockResolvedValue({ id: "proj1", code: "TEST" });
     sessionMock.getServerSession.mockResolvedValue({ user: { id: "user1", role: "MEMBER" } });
     requireProjectRoleMock.mockResolvedValue(true);
-    prismaMock.testCase.deleteMany.mockRejectedValue(new Error("DB connection lost"));
+    softDeleteCasesMock.mockRejectedValue(new Error("DB connection lost"));
 
     const res = await DELETE(makeRequest({ caseIds: ["id1"] }), makeParams("TEST"));
     const json = await res.json();

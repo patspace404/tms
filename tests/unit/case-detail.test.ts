@@ -4,11 +4,15 @@ const projectMock = vi.hoisted(() => ({ findFirst: vi.fn() }));
 const testCaseMock = vi.hoisted(() => ({ findUnique: vi.fn(), delete: vi.fn() }));
 const sessionMock = vi.hoisted(() => ({ getServerSession: vi.fn() }));
 const logAuditMock = vi.hoisted(() => vi.fn());
+const softDeleteCasesMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/prisma", () => ({ prisma: { project: projectMock, testCase: testCaseMock } }));
 vi.mock("next-auth/next", () => ({ getServerSession: sessionMock.getServerSession }));
 vi.mock("@/lib/auth", () => ({ authOptions: {} }));
 vi.mock("@/lib/audit-logger", () => ({ logAudit: logAuditMock }));
+// The route delegates the delete itself; the soft-delete semantics and its
+// audit entry are covered in tests/unit/soft-delete-cases.test.ts.
+vi.mock("@/lib/case-delete", () => ({ softDeleteCases: softDeleteCasesMock }));
 
 import { DELETE } from "@/app/api/projects/[code]/cases/[caseId]/route";
 
@@ -64,34 +68,30 @@ describe("DELETE /api/projects/[code]/cases/[caseId]", () => {
     expect(body.error).toBe("Test case not found");
   });
 
-  it("deletes the test case, calls logAudit, and returns { success: true }", async () => {
+  it("moves the test case to the trash and returns { success: true }", async () => {
     sessionMock.getServerSession.mockResolvedValue({ user: { id: "user-1" } });
     projectMock.findFirst.mockResolvedValue({ id: "project-1", code: "PROJ" });
     testCaseMock.findUnique.mockResolvedValue({ id: "case-1", projectId: "project-1", title: "Login Test" });
-    testCaseMock.delete.mockResolvedValue({});
-    logAuditMock.mockResolvedValue(undefined);
+    softDeleteCasesMock.mockResolvedValue(1);
 
     const res = await DELETE(new Request("http://localhost"), routeParams("PROJ", "case-1"));
     const body = await res.json();
 
     expect(res.status).toBe(200);
     expect(body).toEqual({ success: true });
-    expect(testCaseMock.delete).toHaveBeenCalledWith({ where: { id: "case-1" } });
-    expect(logAuditMock).toHaveBeenCalledWith({
-      projectId: "project-1",
+    expect(softDeleteCasesMock).toHaveBeenCalledWith("project-1", ["case-1"], {
       userId: "user-1",
-      action: "DELETED",
-      entity: "TEST_CASE",
-      entityId: "case-1",
-      details: "Deleted Test Case: Login Test",
     });
+    // The audit entry lives in softDeleteCases now, so that a delete from any
+    // of the three routes records the same thing.
+    expect(logAuditMock).not.toHaveBeenCalled();
   });
 
   it("returns 500 when delete throws an error", async () => {
     sessionMock.getServerSession.mockResolvedValue({ user: { id: "user-1" } });
     projectMock.findFirst.mockResolvedValue({ id: "project-1", code: "PROJ" });
     testCaseMock.findUnique.mockResolvedValue({ id: "case-1", projectId: "project-1", title: "Login Test" });
-    testCaseMock.delete.mockRejectedValue(new Error("DB connection lost"));
+    softDeleteCasesMock.mockRejectedValue(new Error("DB connection lost"));
 
     const res = await DELETE(new Request("http://localhost"), routeParams("PROJ", "case-1"));
     const body = await res.json();

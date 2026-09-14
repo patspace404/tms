@@ -6,6 +6,7 @@ const testCaseMock = vi.hoisted(() => ({
   findMany: vi.fn(),
   create: vi.fn(),
 }));
+const softDeleteCasesMock = vi.hoisted(() => vi.fn());
 const sessionMock = vi.hoisted(() => ({ getServerSession: vi.fn() }));
 const requireProjectRoleMock = vi.hoisted(() => vi.fn());
 
@@ -14,6 +15,9 @@ vi.mock("@/lib/prisma", () => ({
 }));
 vi.mock("next-auth/next", () => ({ getServerSession: sessionMock.getServerSession }));
 vi.mock("@/lib/project-auth", () => ({ requireProjectRole: requireProjectRoleMock }));
+// The route delegates the delete; soft-delete semantics are covered in
+// tests/unit/soft-delete-cases.test.ts.
+vi.mock("@/lib/case-delete", () => ({ softDeleteCases: softDeleteCasesMock }));
 vi.mock("@/lib/auth", () => ({ authOptions: {} }));
 
 import { DELETE as bulkDelete } from "@/app/api/projects/[code]/cases/bulk/route";
@@ -83,9 +87,9 @@ describe("DELETE /api/projects/[code]/cases/bulk", () => {
     expect(testCaseMock.deleteMany).not.toHaveBeenCalled();
   });
 
-  it("deletes cases scoped to project and returns count", async () => {
+  it("moves cases to the trash, scoped to project, and returns the count", async () => {
     sessionMock.getServerSession.mockResolvedValue({ user: fakeUser });
-    testCaseMock.deleteMany.mockResolvedValue({ count: 2 });
+    softDeleteCasesMock.mockResolvedValue(2);
 
     const res = await bulkDelete(
       jsonRequest("DELETE", "http://localhost/api/projects/FIN/cases/bulk", { caseIds: ["c1", "c2"] }),
@@ -95,9 +99,11 @@ describe("DELETE /api/projects/[code]/cases/bulk", () => {
 
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
-    expect(testCaseMock.deleteMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ projectId: "proj-fin" }) })
-    );
+    expect(body.count).toBe(2);
+    // Scoped to the project, and moved to the trash rather than removed.
+    expect(softDeleteCasesMock).toHaveBeenCalledWith("proj-fin", ["c1", "c2"], {
+      userId: fakeUser.id,
+    });
   });
 
   it("returns 404 when project not found", async () => {

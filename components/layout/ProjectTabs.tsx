@@ -39,6 +39,7 @@ export function ProjectTabs({ projectCode }: { projectCode: string }) {
     { name: "Audit Logs", href: `${base}/activity` },
     { name: "Shared Steps", href: `${base}/shared-steps` },
     { name: "Environments", href: `${base}/environments` },
+    { name: "Trash", href: `${base}/trash` },
   ];
 
   const isActive = (match: string) =>

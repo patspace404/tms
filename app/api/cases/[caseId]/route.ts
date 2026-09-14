@@ -6,6 +6,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { logAudit } from "@/lib/audit-logger";
+import { softDeleteCases } from "@/lib/case-delete";
+import { requireProjectRole } from "@/lib/project-auth";
 
 // Scalar fields whose changes we record in the case change history.
 const TRACKED_FIELDS = [
@@ -125,11 +127,45 @@ export async function PATCH(
   }
 }
 
+/**
+ * Move a case to the trash.
+ *
+ * This route previously deleted the row outright with no authorisation at all
+ * — any signed-in account could destroy a case in any project, and nothing was
+ * written down. It now checks the caller's role on the case's own project and
+ * records who did it.
+ */
 export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ caseId: string }> },
 ) {
   const { caseId } = await params;
-  await prisma.testCase.delete({ where: { id: caseId } });
+
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = (session.user as { id: string }).id;
+
+  const testCase = await prisma.testCase.findUnique({
+    where: { id: caseId },
+    select: { projectId: true, project: { select: { code: true } } },
+  });
+  if (!testCase) {
+    return NextResponse.json({ error: "Test case not found" }, { status: 404 });
+  }
+
+  const allowed = await requireProjectRole(testCase.project.code, userId, [
+    "EDITOR",
+    "ADMIN",
+  ]);
+  if (!allowed && (session.user as { role?: string }).role !== "ADMIN") {
+    return NextResponse.json(
+      { error: "Forbidden: you cannot delete cases in this project" },
+      { status: 403 },
+    );
+  }
+
+  await softDeleteCases(testCase.projectId, [caseId], { userId });
   return new NextResponse(null, { status: 204 });
 }

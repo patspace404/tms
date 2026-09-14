@@ -317,8 +317,15 @@ model TestCase {
   suiteId String?
   suite   TestSuite? @relation(fields: [suiteId], references: [id], onDelete: SetNull)
 
-  authorId     String?
-  author       User?         @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorId String?
+  author   User?   @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  /// Soft delete. Set instead of removing the row, so a case deleted by
+  /// mistake can be restored — twelve were lost this way in one week, and the
+  /// only reason they came back is that Qase still held them. Reads go through
+  /// the extension in lib/prisma.ts, which hides these rows everywhere.
+  deletedAt    DateTime?
+  deletedById  String?
   linkedIssues LinkedIssue[]
 
   steps       TestStep[]
@@ -338,6 +345,8 @@ model TestCase {
   @@unique([projectId, sequenceNumber])
   @@index([projectId])
   @@index([suiteId])
+  // Every list query filters on this, so it belongs in the index.
+  @@index([projectId, deletedAt])
 }
 
 model Tag {

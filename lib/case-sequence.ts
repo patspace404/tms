@@ -20,8 +20,23 @@ import { Prisma } from "@prisma/client";
  *
  * Must be called inside a transaction — pass the transaction client.
  */
+/**
+ * Structural, not `Prisma.TransactionClient`: the client is extended (see
+ * lib/prisma.ts) and its transaction client no longer matches that nominal
+ * type. Naming the two operations actually used keeps this callable from
+ * either client.
+ */
+type SequenceTx = {
+  project: {
+    update: (args: any) => Promise<any>;
+  };
+  testCase: {
+    aggregate: (args: any) => Promise<any>;
+  };
+};
+
 export async function allocateSequenceNumber(
-  tx: Prisma.TransactionClient,
+  tx: SequenceTx,
   projectId: string,
 ): Promise<number> {
   const { caseSequence } = await tx.project.update({

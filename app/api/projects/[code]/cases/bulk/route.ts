@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { requireProjectRole } from "@/lib/project-auth";
+import { softDeleteCases } from "@/lib/case-delete";
 
 export async function DELETE(
   req: Request,
@@ -25,6 +26,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const userId = (session.user as any).id;
     const hasAccess = await requireProjectRole(
       project.code,
       (session.user as any).id,
@@ -50,14 +52,10 @@ export async function DELETE(
       );
     }
 
-    await prisma.testCase.deleteMany({
-      where: {
-        id: { in: caseIds },
-        projectId: project.id, // Ensure we only delete cases within this project
-      },
-    });
+    // Moves to the trash rather than removing the rows, and records who did it.
+    const count = await softDeleteCases(project.id, caseIds, { userId });
 
-    return NextResponse.json({ success: true, count: caseIds.length });
+    return NextResponse.json({ success: true, count });
   } catch (error) {
     console.error("Failed to bulk delete test cases", error);
     return NextResponse.json(
