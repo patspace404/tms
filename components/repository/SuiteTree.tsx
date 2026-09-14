@@ -11,7 +11,8 @@ import {
   X,
   FolderPlus,
   FileText,
-  Trash2
+  Trash2,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Suite } from "@/types/repository";
@@ -28,6 +29,7 @@ interface SuiteItemProps {
   selectedSuiteId: string | null;
   onAddChild: (parentId: string) => void;
   onDeleteClick: (suite: any) => void;
+  onRename: (suiteId: string, title: string) => Promise<void>;
 }
 
 const SuiteItem = ({
@@ -37,8 +39,33 @@ const SuiteItem = ({
   selectedSuiteId,
   onAddChild,
   onDeleteClick,
+  onRename,
 }: SuiteItemProps) => {
   const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(suite.title);
+  const [saving, setSaving] = useState(false);
+
+  const startRename = () => {
+    setDraft(suite.title);
+    setEditing(true);
+  };
+
+  const commitRename = async () => {
+    const next = draft.trim();
+    setEditing(false);
+    // An empty name is not a name, and an unchanged one is not a save.
+    if (!next || next === suite.title) {
+      setDraft(suite.title);
+      return;
+    }
+    setSaving(true);
+    try {
+      await onRename(suite.id, next);
+    } finally {
+      setSaving(false);
+    }
+  };
   const { role } = useProjectRole();
   const { isExpanded, toggleSuite } = useSuiteExpansion();
   const isOpen = isExpanded(suite.id);
@@ -87,14 +114,40 @@ const SuiteItem = ({
           )}
         </span>
 
-        <span
-          title={suite.title}
-          className={cn(
-          "flex-1 text-[14px] whitespace-nowrap overflow-hidden text-ellipsis",
-          isActive ? "font-semibold" : "font-medium"
-        )}>
-          {suite.title}
-        </span>
+        {editing ? (
+          <input
+            autoFocus
+            value={draft}
+            disabled={saving}
+            onChange={(e) => setDraft(e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            onBlur={commitRename}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === "Enter") commitRename();
+              // Escape restores the original — a rename must be abandonable.
+              if (e.key === "Escape") {
+                setDraft(suite.title);
+                setEditing(false);
+              }
+            }}
+            className="min-w-0 flex-1 rounded-[6px] border border-primary bg-surface px-[6px] py-[1px] text-[14px] font-medium text-text-main outline-none disabled:opacity-60"
+          />
+        ) : (
+          <span
+            title={suite.title}
+            onDoubleClick={(e) => {
+              if (role === "VIEWER" || suite.id === "unassigned") return;
+              e.stopPropagation();
+              startRename();
+            }}
+            className={cn(
+            "flex-1 text-[14px] whitespace-nowrap overflow-hidden text-ellipsis",
+            isActive ? "font-semibold" : "font-medium"
+          )}>
+            {suite.title}
+          </span>
+        )}
 
         <div className="ml-auto flex items-center gap-2">
           {suite.caseCount !== undefined && (
@@ -115,6 +168,16 @@ const SuiteItem = ({
                 title="Add child suite"
               >
                 <Plus size={14} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  startRename();
+                }}
+                className="p-0.5 hover:text-primary transition-colors mx-1"
+                title="Rename suite (or double-click the name)"
+              >
+                <Pencil size={14} />
               </button>
               <button
                 onClick={(e) => {
@@ -146,6 +209,7 @@ const SuiteItem = ({
                 selectedSuiteId={selectedSuiteId}
                 onAddChild={onAddChild}
                 onDeleteClick={onDeleteClick}
+                onRename={onRename}
               />
             ))}
         </div>
@@ -260,6 +324,29 @@ export const SuiteTree = ({
     return ids;
   };
 
+  const handleRenameSuite = async (suiteId: string, title: string) => {
+    const previous = suites;
+    // Optimistic: the tree is the thing being edited, so it should not lag
+    // behind the keystroke that changed it. Rolled back if the save fails.
+    setSuites((prev) => prev.map((s) => (s.id === suiteId ? { ...s, title } : s)));
+    try {
+      const res = await fetch(`/api/projects/${projectCode}/suites/${suiteId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to rename suite");
+      }
+      toast.success("Suite renamed");
+      router.refresh();
+    } catch (err) {
+      setSuites(previous);
+      toast.error(err instanceof Error ? err.message : "Failed to rename suite");
+    }
+  };
+
   const handleDeleteSuite = async (retainCases: boolean) => {
     if (!suiteToDelete) return;
     setIsDeleting(true);
@@ -362,6 +449,7 @@ export const SuiteTree = ({
             selectedSuiteId={selectedSuiteId}
             onAddChild={handleOpenCreateModal}
             onDeleteClick={setSuiteToDelete}
+            onRename={handleRenameSuite}
           />
         ))}
         {unassignedCount > 0 && (
@@ -378,6 +466,7 @@ export const SuiteTree = ({
             selectedSuiteId={selectedSuiteId}
             onAddChild={() => {}}
             onDeleteClick={() => {}}
+            onRename={async () => {}}
           />
         )}
       </div>

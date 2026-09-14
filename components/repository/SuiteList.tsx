@@ -16,8 +16,10 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight as ChevronRightIcon,
+  Check,
 } from "lucide-react";
 import { useSuiteSelection } from "@/components/providers/SuiteSelectionProvider";
+import { useProjectRole } from "@/components/providers/ProjectRoleProvider";
 
 interface SuiteListProps {
   suites: any[];
@@ -55,7 +57,9 @@ export function SuiteList({
   onBulkRun,
   onBulkDelete,
 }: SuiteListProps) {
-  const { selectedCases, toggleCase, clearSelection } = useSuiteSelection();
+  const { selectedCases, toggleCase, toggleSuiteCases, clearSelection } =
+    useSuiteSelection();
+  const { role } = useProjectRole();
   const [page, setPage] = useState(1);
 
   // Helper to get all descendant suite IDs for a given suite
@@ -134,6 +138,13 @@ export function SuiteList({
   );
 
   const hasSelection = selectedCases.size > 0;
+
+  // Scoped to the visible page, so the header tick always describes the rows
+  // the reader can actually see.
+  const allOnPageSelected =
+    pagedCases.length > 0 && pagedCases.every((c: any) => selectedCases.has(c.id));
+  const someOnPageSelected =
+    !allOnPageSelected && pagedCases.some((c: any) => selectedCases.has(c.id));
 
   // Qase-style dense table: check · priority · type · ID · TITLE · TAGS · TYPE · OWNER
   const GRID =
@@ -228,7 +239,37 @@ export function SuiteList({
         className="grid gap-[12px] px-[18px] py-[8px] text-[11.5px] font-semibold tracking-[0.05em] uppercase text-text-faint border-b border-border shrink-0 bg-surface-hover/40"
         style={{ gridTemplateColumns: GRID }}
       >
-        <div></div>
+        {/* Select-all for what is on screen. It acts on the current page, not
+            the whole suite: a tick that silently reaches rows you cannot see
+            makes the next click — Delete — dangerous. */}
+        <div className="flex items-center">
+          {role !== "VIEWER" && pagedCases.length > 0 && (
+            <button
+              type="button"
+              onClick={() => toggleSuiteCases(pagedCases.map((c: any) => c.id))}
+              aria-label={allOnPageSelected ? "Clear selection" : "Select all on this page"}
+              title={
+                allOnPageSelected
+                  ? `Clear ${pagedCases.length} selected`
+                  : `Select all ${pagedCases.length} on this page`
+              }
+              className="flex h-[15px] w-[15px] items-center justify-center rounded-[4px] border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
+              style={{
+                borderColor:
+                  allOnPageSelected || someOnPageSelected
+                    ? "var(--primary)"
+                    : "var(--border-color)",
+                background:
+                  allOnPageSelected || someOnPageSelected ? "var(--primary)" : "transparent",
+              }}
+            >
+              {allOnPageSelected && <Check size={11} className="text-white" strokeWidth={3.5} />}
+              {someOnPageSelected && !allOnPageSelected && (
+                <span className="h-[2px] w-[7px] rounded-full bg-white" />
+              )}
+            </button>
+          )}
+        </div>
         <div></div>
         <div></div>
         <div>ID</div>
