@@ -41,6 +41,7 @@ import {
 import { ReportBugModal } from "./ReportBugModal";
 import { toast } from "sonner";
 import { MAX_UPLOAD_BYTES, tooLargeMessage } from "@/lib/upload-limits";
+import { isDocumentUrl, isVideoUrl } from "@/lib/attachment-kind";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { createRoot } from "react-dom/client";
@@ -1983,9 +1984,9 @@ export default function RunExecutionClient({
                               <div className="flex flex-wrap gap-2">
                                 {attachments.map((att: any, i: number) => (
                                   <div key={i} className="relative w-28 h-20 border border-border rounded-md overflow-hidden group bg-surface-hover flex items-center justify-center cursor-pointer hover:border-primary transition-colors" onClick={() => setViewingAttachment({ url: att.url, name: att.name || "Attachment" })}>
-                                    {att.url?.match(/\.(mp4|webm|ogg)$/i) ? (
+                                    {isVideoUrl(att.url) ? (
                                       <video src={att.url} className="w-full h-full object-contain bg-black" />
-                                    ) : att.url?.match(/\.(zip|pdf|csv|txt|doc|docx|xls|xlsx)$/i) ? (
+                                    ) : isDocumentUrl(att.url) ? (
                                       <div className="w-full h-full flex flex-col items-center justify-center text-text-faint"><FileText size={24} /><span className="text-[10px] truncate w-full px-1 text-center">{att.name || "File"}</span></div>
                                     ) : (
                                       <img src={att.url} alt={att.name || "Attachment"} className="w-full h-full object-contain" />
@@ -2020,9 +2021,9 @@ export default function RunExecutionClient({
                     <div className="grid grid-cols-2 gap-2">
                       {evidence.map((att, i) => (
                         <div key={i} className="aspect-[16/10] rounded-[9px] bg-surface-hover border border-border overflow-hidden cursor-pointer hover:border-primary transition-colors flex items-center justify-center" onClick={() => setViewingAttachment({ url: att.url, name: att.name || "Attachment" })}>
-                          {att.url?.match(/\.(mp4|webm|ogg)$/i) ? (
+                          {isVideoUrl(att.url) ? (
                             <video src={att.url} className="w-full h-full object-contain bg-black" />
-                          ) : att.url?.match(/\.(zip|pdf|csv|txt|doc|docx|xls|xlsx)$/i) ? (
+                          ) : isDocumentUrl(att.url) ? (
                             <div className="flex flex-col items-center gap-1 text-text-faint"><FileText size={24} /><span className="font-mono text-[10px] truncate w-full px-1 text-center">{att.name}</span></div>
                           ) : (
                             <img src={att.url} alt={att.name || "Evidence"} className="w-full h-full object-contain" />
@@ -2300,7 +2301,7 @@ export default function RunExecutionClient({
               <button onClick={() => setViewingAttachment(null)} aria-label="Close" className="bg-surface/10 hover:bg-surface/20 text-white rounded-full p-2 transition backdrop-blur-sm"><XCircle size={32} /></button>
             </div>
             <div className="relative w-full h-full flex items-center justify-center animate-in zoom-in-95 duration-200 p-8 pt-16" onClick={(e) => e.stopPropagation()}>
-              {viewingAttachment.url?.match(/\.(mp4|webm|ogg)$/i) ? (
+              {isVideoUrl(viewingAttachment.url) ? (
                 <video src={viewingAttachment.url} controls autoPlay className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl bg-black" />
               ) : viewingAttachment.isTrace ? (
                 <div className="w-full h-full bg-surface rounded-lg overflow-hidden shadow-2xl flex flex-col">
@@ -2312,7 +2313,7 @@ export default function RunExecutionClient({
                   </div>
                   <iframe src={`https://trace.playwright.dev/?trace=${encodeURIComponent(viewingAttachment.url)}`} className="w-full flex-1 border-none" title="Playwright Trace Viewer" />
                 </div>
-              ) : viewingAttachment.url?.match(/\.(zip|pdf|csv|txt|doc|docx|xls|xlsx)$/i) ? (
+              ) : isDocumentUrl(viewingAttachment.url) ? (
                 <div className="bg-surface p-12 rounded-lg shadow-2xl flex flex-col items-center justify-center border border-border min-w-[300px]">
                   <FileText size={48} className="text-text-muted mb-4" />
                   <h3 className="text-lg font-bold text-text-main mb-6 text-center break-all max-w-sm">{viewingAttachment.name}</h3>
