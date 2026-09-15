@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { s3Client, S3_BUCKET } from "@/lib/s3";
+import { MAX_UPLOAD_BYTES, tooLargeMessage } from "@/lib/upload-limits";
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,6 +14,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "File and projectId are required" },
         { status: 400 },
+      );
+    }
+
+    // Say why a file is too big. Without this the only thing standing between a
+    // screen recording and the server is nginx, which answers with an HTML
+    // error page that tells the person nothing.
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return NextResponse.json(
+        { error: tooLargeMessage(file.name, file.size) },
+        { status: 413 },
       );
     }
 

@@ -3,9 +3,8 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { prisma } from "@/lib/prisma";
 import { s3Client, S3_BUCKET } from "@/lib/s3";
 import { fail, handler, ok, requireProject, WRITE_ROLES } from "@/lib/api-v1";
+import { MAX_UPLOAD_BYTES, tooLargeMessage } from "@/lib/upload-limits";
 import { NextResponse } from "next/server";
-
-const MAX_BYTES = 50 * 1024 * 1024; // 50 MB — enough for a screen recording
 
 // POST /api/v1/attachment/{code}
 // multipart/form-data with one or more `file` parts.
@@ -29,8 +28,8 @@ export const POST = handler(async (req, { params }) => {
 
   const uploaded = [];
   for (const file of files) {
-    if (file.size > MAX_BYTES) {
-      return fail(`'${file.name}' exceeds the ${MAX_BYTES / 1024 / 1024}MB limit.`, 413);
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return fail(tooLargeMessage(file.name, file.size), 413);
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());

@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { ReportBugModal } from "./ReportBugModal";
 import { toast } from "sonner";
+import { MAX_UPLOAD_BYTES, tooLargeMessage } from "@/lib/upload-limits";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { createRoot } from "react-dom/client";
@@ -1147,23 +1148,40 @@ export default function RunExecutionClient({
     const list = (Array.isArray(files) ? files : [files]).filter(Boolean);
     if (list.length === 0) return;
 
+    // Turn an oversized file away here rather than after a long upload that was
+    // never going to be accepted.
+    const tooBig = list.filter((f) => f.size > MAX_UPLOAD_BYTES);
+    for (const f of tooBig) toast.error(tooLargeMessage(f.name, f.size));
+    const toSend = list.filter((f) => f.size <= MAX_UPLOAD_BYTES);
+    if (toSend.length === 0) return;
+
     setUploadingStepId(stepId);
     const uploaded: { url: string; name: string }[] = [];
     const failed: string[] = [];
 
     try {
-      for (const file of list) {
+      for (const file of toSend) {
         try {
           const formData = new FormData();
           formData.append("file", file);
           formData.append("projectId", projectCode);
           const res = await fetch("/api/upload", { method: "POST", body: formData });
-          if (!res.ok) throw new Error("Upload failed");
+          if (!res.ok) {
+            // Prefer whatever the server said; fall back only when it said
+            // nothing useful, as nginx does when it rejects the body itself.
+            const said = await res.json().catch(() => null);
+            throw new Error(
+              said?.error ||
+                (res.status === 413
+                  ? `${file.name} is too large to upload.`
+                  : `Could not upload ${file.name}`),
+            );
+          }
           const data = await res.json();
           uploaded.push({ url: data.url, name: file.name });
         } catch (error) {
           console.error(error);
-          failed.push(file.name);
+          failed.push(error instanceof Error ? error.message : `Could not upload ${file.name}`);
         }
       }
 
@@ -1171,12 +1189,9 @@ export default function RunExecutionClient({
         const currentAtts = stepResults[stepId]?.attachments || [];
         updateStepResult(stepId, { attachments: [...currentAtts, ...uploaded] });
       }
-      if (failed.length > 0) {
-        toast.error(
-          failed.length === 1
-            ? `Could not upload ${failed[0]}`
-            : `Could not upload ${failed.length} files: ${failed.slice(0, 3).join(", ")}`,
-        );
+      for (const message of failed.slice(0, 3)) toast.error(message);
+      if (failed.length > 3) {
+        toast.error(`${failed.length - 3} more files could not be uploaded.`);
       }
     } finally {
       setUploadingStepId(null);
