@@ -32,7 +32,9 @@ export default async function ProjectsPage({
       include: {
         _count: {
           select: {
-            testCases: true,
+            testCases: {
+              where: { deletedAt: null }
+            },
             suites: true,
             testRuns: true,
             members: true,
@@ -43,13 +45,17 @@ export default async function ProjectsPage({
           where: { status: "ACTIVE" },
           select: { id: true },
         },
-        testCases: {
-          select: {
-            automationStatus: true,
-          },
-        },
       },
     });
+
+    const automatedCasesGroup = await prisma.testCase.groupBy({
+      by: ["projectId"],
+      where: { automationStatus: "AUTOMATED", deletedAt: null },
+      _count: { id: true },
+    });
+    const automatedCasesMap = new Map(
+      automatedCasesGroup.map((g) => [g.projectId, g._count.id])
+    );
 
     projectsWithLatestRuns = await Promise.all(
       projects.map(async (project) => {
@@ -57,7 +63,11 @@ export default async function ProjectsPage({
         const latestRun = await prisma.testRun.findFirst({
           where: { projectId: project.id },
           orderBy: { createdAt: "desc" },
-          include: { results: true },
+          select: {
+            results: {
+              select: { status: true }
+            }
+          }
         });
 
         let passRate: number | null = null;
@@ -70,10 +80,8 @@ export default async function ProjectsPage({
         }
 
         // Automation calc
-        const totalCases = project.testCases.length;
-        const automatedCases = project.testCases.filter(
-          (c) => c.automationStatus === "AUTOMATED",
-        ).length;
+        const totalCases = project._count.testCases;
+        const automatedCases = automatedCasesMap.get(project.id) || 0;
         const automationPercent =
           totalCases > 0 ? (automatedCases / totalCases) * 100 : 0;
 
