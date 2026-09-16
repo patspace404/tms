@@ -9,6 +9,26 @@ import { logAudit } from "@/lib/audit-logger";
 import { softDeleteCases } from "@/lib/case-delete";
 import { requireProjectRole } from "@/lib/project-auth";
 
+// What a PATCH is allowed to write. Relations (steps, tags, attachments) are
+// handled separately below; everything not named here is ignored.
+const EDITABLE_FIELDS = [
+  "title",
+  "description",
+  "preconditions",
+  "postconditions",
+  "severity",
+  "priority",
+  "automationStatus",
+  "automationScript",
+  "suiteId",
+  "authorId",
+  "requirementText",
+  "jiraId",
+  "githubPrUrl",
+  "isOutdated",
+  "customFields",
+] as const;
+
 // Scalar fields whose changes we record in the case change history.
 const TRACKED_FIELDS = [
   "title",
@@ -32,6 +52,9 @@ export async function GET(
     include: {
       steps: { orderBy: { position: "asc" } },
       author: { select: { name: true, email: true } },
+      // The edit form needs these to show what the case already has.
+      tags: { select: { id: true, name: true } },
+      attachments: true,
     },
   });
   if (!testCase)
@@ -47,7 +70,16 @@ export async function PATCH(
   try {
     const body = await req.json();
     // For steps update, we delete existing and recreate to maintain order easily
-    const { steps, ...caseData } = body;
+    const { steps, tags, attachmentIds, ...rest } = body;
+
+    // Only the fields the form owns reach Prisma. The body used to be spread
+    // straight into update(), so anything the client sent became a column
+    // write — projectId, sequenceNumber, deletedAt included — and a relation
+    // name like `tags` threw instead of updating anything.
+    const caseData: Record<string, unknown> = {};
+    for (const f of EDITABLE_FIELDS) {
+      if (f in rest) caseData[f] = rest[f];
+    }
 
     const session = await getServerSession(authOptions);
     const actorId = session?.user ? (session.user as any).id : null;
@@ -71,20 +103,49 @@ export async function PATCH(
                 })),
               }
             : undefined,
+          // `set: []` first, so a tag the user removed in the form is actually
+          // dropped rather than merged back in. Tags are unique per project,
+          // so they are matched on the [name, projectId] pair.
+          tags:
+            Array.isArray(tags) && existingCase
+              ? {
+                  set: [],
+                  connectOrCreate: tags
+                    .map((name: string) => String(name).trim())
+                    .filter(Boolean)
+                    .map((name: string) => ({
+                      where: {
+                        name_projectId: {
+                          name,
+                          projectId: existingCase.projectId,
+                        },
+                      },
+                      create: { name, projectId: existingCase.projectId },
+                    })),
+                }
+              : undefined,
+          // `set` rather than `connect`: the form sends the whole list, so a
+          // file removed there has to actually come off the case. The row
+          // itself stays — it is still the project's file.
+          attachments: Array.isArray(attachmentIds)
+            ? { set: attachmentIds.map((id: string) => ({ id })) }
+            : undefined,
         },
         include: { steps: true, author: true },
       });
 
       // Notification Logic: If authorId (assignee) changed
+      const newAuthorId =
+        typeof caseData.authorId === "string" ? caseData.authorId : null;
       if (
-        caseData.authorId && 
-        existingCase && 
-        existingCase.authorId !== caseData.authorId &&
-        caseData.authorId !== actorId // Don't notify if assigning to self
+        newAuthorId &&
+        existingCase &&
+        existingCase.authorId !== newAuthorId &&
+        newAuthorId !== actorId // Don't notify if assigning to self
       ) {
         await tx.notification.create({
           data: {
-            recipientId: caseData.authorId,
+            recipientId: newAuthorId,
             actorId: actorId,
             type: "ASSIGNMENT",
             entityId: updated.id,

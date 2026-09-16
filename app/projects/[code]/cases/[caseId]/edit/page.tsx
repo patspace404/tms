@@ -15,9 +15,13 @@ import {
   Beaker,
   AlertCircle,
   Zap,
+  Folder,
+  Tag as TagIcon,
+  FileIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
+import { FileUpload } from "@/components/ui/FileUpload";
 import {
   DndContext,
   closestCenter,
@@ -50,6 +54,11 @@ interface TestStepInput {
   action: string;
   expectedResult: string;
 }
+
+// The inputs on this page all share one look; keeping it in a constant stops
+// the newer fields from drifting from the ones that were already here.
+const FIELD_CLASS =
+  "w-full px-4 py-2.5 text-[13px] font-semibold bg-surface-hover/50 border border-border/80 rounded-xl shadow-inner placeholder-text-muted/50 focus:outline-none focus:ring-4 focus:ring-primary/20 focus:border-primary transition-all hover:border-text-muted/40 text-text-main resize-y";
 
 function SortableStepItem({
   field,
@@ -128,11 +137,14 @@ function SortableStepItem({
 
 interface TestCaseFormValues {
   title: string;
+  suiteId: string;
   description: string;
   preconditions: string;
+  postconditions: string;
   severity: Severity;
   priority: Priority;
   automationStatus: AutomationStatus;
+  tagsInput: string;
   steps: TestStepInput[];
   customFields: Record<string, any>;
 }
@@ -148,9 +160,11 @@ export default function TestCaseEditor() {
   } = useForm<TestCaseFormValues>({
     defaultValues: {
       title: "",
+      suiteId: "",
       severity: "NORMAL",
       priority: "MEDIUM",
       automationStatus: "MANUAL",
+      tagsInput: "",
       steps: [{ action: "", expectedResult: "" }], // Start with one empty step
       customFields: {},
     },
@@ -199,6 +213,16 @@ export default function TestCaseEditor() {
 
   const [customFieldsDef, setCustomFieldsDef] = React.useState<any[]>([]);
   const [caseCode, setCaseCode] = React.useState<string>("");
+  const [suites, setSuites] = React.useState<any[]>([]);
+  const [attachments, setAttachments] = React.useState<any[]>([]);
+
+  useEffect(() => {
+    if (!projectCode) return;
+    fetch(`/api/projects/${projectCode}/suites`)
+      .then((res) => res.json())
+      .then((data) => setSuites(Array.isArray(data) ? data : []))
+      .catch(console.error);
+  }, [projectCode]);
 
   useEffect(() => {
     if (!projectCode) return;
@@ -233,13 +257,17 @@ export default function TestCaseEditor() {
               ? `${projectCode}-${data.sequenceNumber}`
               : data.title || "",
           );
+          setAttachments(data.attachments || []);
           reset({
             title: data.title,
+            suiteId: data.suiteId || "",
             severity: data.severity || "NORMAL",
             priority: data.priority || "MEDIUM",
             automationStatus: data.automationStatus || "MANUAL",
             preconditions: data.preconditions || "",
+            postconditions: data.postconditions || "",
             description: data.description || "",
+            tagsInput: (data.tags || []).map((t: any) => t.name).join(", "),
             steps:
               data.steps && data.steps.length > 0
                 ? data.steps
@@ -264,13 +292,22 @@ export default function TestCaseEditor() {
   }, [caseId, reset, projectCode, router]);
 
   const onSubmit = async (data: TestCaseFormValues) => {
-    console.log("Saving Test Case Edits:", data);
+    const { tagsInput, ...rest } = data;
+    const tags = tagsInput
+      ? tagsInput
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean)
+      : [];
+
     try {
       const res = await fetch(`/api/cases/${caseId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...data,
+          ...rest,
+          tags,
+          attachmentIds: attachments.map((a) => a.id),
           steps: data.steps.map((s, i) => ({ ...s, position: i })),
         }),
       });
@@ -342,6 +379,101 @@ export default function TestCaseEditor() {
                 {errors.title.message}
               </p>
             )}
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-semibold text-text-main mb-2">
+              Description
+            </label>
+            <textarea
+              {...register("description")}
+              rows={3}
+              placeholder="Verify the best single discount is applied..."
+              className={FIELD_CLASS}
+            />
+          </div>
+
+          {/* Preconditions */}
+          <div>
+            <label className="block text-sm font-semibold text-text-main mb-2">
+              Preconditions
+            </label>
+            <textarea
+              {...register("preconditions")}
+              rows={2}
+              placeholder="Cart has 2 items ($96.00)..."
+              className={FIELD_CLASS}
+            />
+          </div>
+
+          {/* Postconditions */}
+          <div>
+            <label className="block text-sm font-semibold text-text-main mb-2">
+              Postconditions
+            </label>
+            <textarea
+              {...register("postconditions")}
+              rows={2}
+              placeholder="Cart is emptied and the order appears in history..."
+              className={FIELD_CLASS}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Suite */}
+            <div>
+              <label className="flex items-center text-sm font-semibold text-text-main mb-2">
+                <Folder size={14} className="mr-1.5 text-text-muted" /> Suite
+              </label>
+              {/* The suite list arrives after the case does, and until it is
+                  here the select has nothing to match the case's suiteId
+                  against — it would sit on whichever option came first and
+                  invite a click that moves the case somewhere else. */}
+              <select
+                {...register("suiteId", { required: "Suite is required" })}
+                disabled={suites.length === 0}
+                className={cn(
+                  FIELD_CLASS,
+                  "appearance-none cursor-pointer",
+                  suites.length === 0 && "opacity-60 cursor-wait",
+                  errors.suiteId && "border-danger",
+                )}
+              >
+                {suites.length === 0 ? (
+                  <option value="">Loading suites…</option>
+                ) : (
+                  <option value="" disabled>
+                    Select...
+                  </option>
+                )}
+                {suites.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.title}
+                  </option>
+                ))}
+              </select>
+              {errors.suiteId && (
+                <p className="mt-1 text-xs text-danger">
+                  {errors.suiteId.message}
+                </p>
+              )}
+            </div>
+
+            {/* Tags */}
+            <div>
+              <label className="flex items-center text-sm font-semibold text-text-main mb-2">
+                <TagIcon size={14} className="mr-1.5 text-text-muted" /> Tags
+              </label>
+              <input
+                {...register("tagsInput")}
+                placeholder="e.g. e2e, pricing"
+                className={FIELD_CLASS}
+              />
+              <p className="mt-1 text-xs text-text-muted">
+                Separate with commas. Removing one here removes it from the case.
+              </p>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -482,6 +614,51 @@ export default function TestCaseEditor() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+        </section>
+
+        {/* Attachments */}
+        <section className="bg-surface rounded-2xl border border-border/80 shadow-premium p-6">
+          <h2 className="text-sm font-semibold text-text-main mb-4">
+            Attachments
+          </h2>
+          <FileUpload
+            projectId={projectCode}
+            onUploadComplete={(attachment) =>
+              setAttachments((prev) => [...prev, attachment])
+            }
+          />
+          {attachments.length > 0 && (
+            <div className="mt-3 space-y-2">
+              {attachments.map((file) => (
+                <div
+                  key={file.id}
+                  className="flex items-center justify-between px-3 py-2 bg-surface-hover/50 border border-border/80 rounded-xl"
+                >
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <FileIcon size={14} className="text-primary shrink-0" />
+                    <span className="text-[12.5px] text-text-main truncate">
+                      {file.originalName}
+                    </span>
+                    <span className="text-[11px] text-text-muted shrink-0">
+                      {(file.size / 1024).toFixed(1)} KB
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setAttachments((prev) =>
+                        prev.filter((a) => a.id !== file.id),
+                      )
+                    }
+                    className="text-text-muted hover:text-danger shrink-0"
+                    aria-label={`Remove ${file.originalName}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </section>

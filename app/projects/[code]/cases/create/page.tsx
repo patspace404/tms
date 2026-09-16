@@ -44,6 +44,7 @@ interface TestCaseFormValues {
   suiteId: string;
   description: string;
   preconditions: string;
+  postconditions: string;
   severity: Severity;
   priority: Priority;
   automationStatus: AutomationStatus;
@@ -223,6 +224,16 @@ function CreateCaseContent({
                 <textarea
                   {...register("preconditions")}
                   placeholder="Cart has 2 items ($96.00)..."
+                  className="w-full min-h-[48px] p-[11px_14px] rounded-[11px] bg-surface text-[13.5px] text-text-main leading-[1.55] outline-none shadow-[inset_0_0_0_1px_var(--border)] focus:shadow-[inset_0_0_0_1px_var(--primary)] focus:ring-2 focus:ring-primary/20 transition-colors resize-y"
+                />
+              </div>
+
+              {/* Postconditions */}
+              <div>
+                <label className="block text-[13px] text-text-muted mb-[7px]">Postconditions</label>
+                <textarea
+                  {...register("postconditions")}
+                  placeholder="Cart is emptied and the order appears in history..."
                   className="w-full min-h-[48px] p-[11px_14px] rounded-[11px] bg-surface text-[13.5px] text-text-main leading-[1.55] outline-none shadow-[inset_0_0_0_1px_var(--border)] focus:shadow-[inset_0_0_0_1px_var(--primary)] focus:ring-2 focus:ring-primary/20 transition-colors resize-y"
                 />
               </div>
