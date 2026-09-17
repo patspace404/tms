@@ -1848,16 +1848,13 @@ export default function RunExecutionClient({
                     const stepData = stepResults[step.id] || {};
                     const stepStatus = stepData.status;
                     const sv = statusVisual(stepStatus);
-                    // Migrated runs often carry no per-step verdict, because
-                    // Qase lets a case be settled without stamping its steps.
-                    // A bare "—" reads as data lost in migration, so say which
-                    // it is: inferred from the case result, or never recorded.
-                    const derived = stepData.derivedFrom === "case-result";
-                    const stepTitle = derived
-                      ? "Inferred from the case result — the case passed, so every step passed. Click to set it yourself."
-                      : stepStatus
-                        ? "Click to cycle status"
-                        : "No result was recorded for this step. Click to set one.";
+                    // `derivedFrom` is still recorded, and the step can still be
+                    // set by hand, but the badge no longer says where the
+                    // verdict came from: the case passed, so the step passed,
+                    // and labelling that only made a sound result look hedged.
+                    const stepTitle = stepStatus
+                      ? "Click to cycle status"
+                      : "No result was recorded for this step. Click to set one.";
                     const sBg = stepStatus === "FAILED" ? "var(--danger-soft)" : "transparent";
                     const actualResult = stepData.actualResult || "";
                     const attachments = stepData.attachments || [];
@@ -1880,12 +1877,9 @@ export default function RunExecutionClient({
                                 background: sv.soft,
                                 color: sv.color,
                                 border: stepStatus ? "none" : "1px solid var(--border-color)",
-                                // Dashed ring marks a verdict nobody typed.
-                                ...(derived ? { boxShadow: "inset 0 0 0 1px var(--success)", opacity: 0.85 } : {}),
                               }}
                             >
                               <sv.Icon size={12} />{sv.label}
-                              {derived && <span className="font-normal opacity-70">·&nbsp;inferred</span>}
                             </button>
                           </div>
                         </div>

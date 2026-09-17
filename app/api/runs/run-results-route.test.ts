@@ -88,7 +88,9 @@ describe("run result API routes", () => {
       });
     });
 
-    it("marks them as inferred rather than passing them off as recorded", async () => {
+    // Not shown anywhere any more, but the marker is what tells a later pass —
+    // the Qase sync included — that nobody stamped these by hand.
+    it("records where the verdict came from", async () => {
       withSteps();
       await PATCH(req({ status: "PASSED" }), params());
       for (const v of Object.values(writtenStepResults())) {
