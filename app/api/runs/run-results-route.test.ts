@@ -61,6 +61,85 @@ describe("run result API routes", () => {
     prismaTransaction.mockImplementation(async (ops: unknown[]) => ops);
   });
 
+  describe("step verdicts when a case is passed", () => {
+    const withSteps = (stepResults: unknown = null) => {
+      resultFindUnique.mockResolvedValue({
+        assigneeId: "actor-1",
+        stepResults,
+        testCase: {
+          title: "Checkout works",
+          steps: [{ id: "step-1" }, { id: "step-2" }],
+        },
+      });
+    };
+    const writtenStepResults = () =>
+      resultUpdate.mock.calls[0][0].data.stepResults as Record<string, any>;
+
+    it("stamps every step, so the report has something to show", async () => {
+      // Passing a case in the app settles the case, not its steps. Without
+      // this the shared report printed a verdict for none of them.
+      withSteps();
+
+      await PATCH(req({ status: "PASSED" }), params());
+
+      expect(writtenStepResults()).toEqual({
+        "step-1": { status: "PASSED", derivedFrom: "case-result" },
+        "step-2": { status: "PASSED", derivedFrom: "case-result" },
+      });
+    });
+
+    it("marks them as inferred rather than passing them off as recorded", async () => {
+      withSteps();
+      await PATCH(req({ status: "PASSED" }), params());
+      for (const v of Object.values(writtenStepResults())) {
+        expect(v.derivedFrom).toBe("case-result");
+      }
+    });
+
+    it("leaves a part-stamped case alone — that is someone's work in progress", async () => {
+      withSteps({ "step-1": { status: "FAILED" } });
+
+      await PATCH(req({ status: "PASSED" }), params());
+
+      // Nothing is written for stepResults at all, which is how Prisma is told
+      // to leave the stored value exactly as it is.
+      expect(writtenStepResults()).toBeUndefined();
+    });
+
+    it("keeps evidence already attached to a step", async () => {
+      withSteps({ "step-1": { attachments: [{ url: "/api/uploads/shot.png" }] } });
+
+      await PATCH(req({ status: "PASSED" }), params());
+
+      expect(writtenStepResults()["step-1"]).toEqual({
+        attachments: [{ url: "/api/uploads/shot.png" }],
+        status: "PASSED",
+        derivedFrom: "case-result",
+      });
+    });
+
+    it("does not infer anything for a failed case", async () => {
+      // Which step failed is not something that can be guessed.
+      withSteps();
+
+      await PATCH(req({ status: "FAILED" }), params());
+
+      expect(resultUpdate.mock.calls[0][0].data.stepResults).toBeUndefined();
+    });
+
+    it("survives a case with no steps", async () => {
+      resultFindUnique.mockResolvedValue({
+        assigneeId: "actor-1",
+        stepResults: null,
+        testCase: { title: "Smoke", steps: [] },
+      });
+
+      const response = await PATCH(req({ status: "PASSED" }), params());
+
+      expect(response.status).toBe(200);
+    });
+  });
+
   it("auto-assigns the actor when status changes and result has no assignee", async () => {
     const response = await PATCH(req({ status: "PASSED" }), params());
 

@@ -29,6 +29,10 @@ export default function PublicReportPage({
   const handleImageClick = (e: React.MouseEvent) => {
     const t = e.target as HTMLElement;
     if (t.tagName === "IMG" && (t as HTMLImageElement).alt === "Evidence") {
+      // Each screenshot is wrapped in a link so it stays openable from the
+      // printed PDF. On screen the lightbox is the better answer, so stop the
+      // link from taking over.
+      e.preventDefault();
       setLightboxSrc((t as HTMLImageElement).src);
     }
   };

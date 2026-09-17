@@ -930,6 +930,21 @@ export function PdfReportTemplate({
                               const stepRes =
                                 (res.stepResults && res.stepResults[step.id]) ||
                                 {};
+
+                              // The same rule the sync and the run screen use:
+                              // a case that passed with nothing stamped on any
+                              // of its steps passed every step. Applied here so
+                              // reports already shared read correctly, without
+                              // rewriting anyone's stored results.
+                              const inferAll =
+                                res.status === "PASSED" &&
+                                !Object.values(
+                                  res.stepResults || {},
+                                ).some((v: any) => v?.status);
+                              const stepStatus = stepRes.status || (inferAll ? "PASSED" : null);
+                              const stepInferred =
+                                stepRes.derivedFrom === "case-result" ||
+                                (!stepRes.status && inferAll);
                               const isLastStep = idx === tc.steps.length - 1;
                               const stepBorderBottom =
                                 isLastStep && globalElements.length === 0
@@ -1017,7 +1032,37 @@ export function PdfReportTemplate({
                                         marginBottom: "4px",
                                       }}
                                     >
-                                      Status: {stepRes.status || "N/A"}
+                                      Status:{" "}
+                                      {stepStatus ? (
+                                        <>
+                                          {stepStatus}
+                                          {stepInferred && (
+                                            <span
+                                              style={{
+                                                fontWeight: "400",
+                                                textTransform: "none",
+                                                color: "#94a3b8",
+                                              }}
+                                            >
+                                              {" "}
+                                              · inferred from the case result
+                                            </span>
+                                          )}
+                                        </>
+                                      ) : (
+                                        // "N/A" reads like something went
+                                        // wrong. Nothing did: no one recorded a
+                                        // verdict for this step.
+                                        <span
+                                          style={{
+                                            fontWeight: "400",
+                                            textTransform: "none",
+                                            color: "#94a3b8",
+                                          }}
+                                        >
+                                          not recorded
+                                        </span>
+                                      )}
                                     </div>
                                     {stepRes.actualResult && (
                                       <div
@@ -1042,18 +1087,37 @@ export function PdfReportTemplate({
                                               /\.(jpeg|jpg|gif|png)$/i,
                                             ) ? (
                                               <>
-                                                <img
-                                                  src={att.url}
-                                                  alt="Evidence"
+                                                {/* The anchor is what makes a
+                                                    screenshot openable from the
+                                                    printed PDF, where there is
+                                                    no lightbox to click. On the
+                                                    report page the lightbox
+                                                    still wins — it cancels this
+                                                    navigation. */}
+                                                <a
+                                                  href={att.url}
+                                                  target="_blank"
+                                                  rel="noreferrer"
+                                                  title="Open the full-size screenshot"
                                                   style={{
-                                                    maxWidth: "100%",
-                                                    maxHeight: "200px",
-                                                    border: "1px solid #e2e8f0",
-                                                    borderRadius: "4px",
                                                     display: "block",
+                                                    textDecoration: "none",
                                                   }}
-                                                  crossOrigin="anonymous"
-                                                />
+                                                >
+                                                  <img
+                                                    src={att.url}
+                                                    alt="Evidence"
+                                                    style={{
+                                                      maxWidth: "100%",
+                                                      maxHeight: "200px",
+                                                      border:
+                                                        "1px solid #e2e8f0",
+                                                      borderRadius: "4px",
+                                                      display: "block",
+                                                    }}
+                                                    crossOrigin="anonymous"
+                                                  />
+                                                </a>
                                                 <div
                                                   style={{
                                                     fontSize: "10px",

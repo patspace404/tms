@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/api-auth";
+import { deriveStepVerdicts } from "@/lib/qase/sync";
 
 export async function GET(
   req: Request,
@@ -65,8 +66,33 @@ export async function PATCH(
     // Get current assignee to check if it changed
     const currentResult = await prisma.testRunResult.findUnique({
       where: { id: resultId },
-      select: { assigneeId: true, testCase: { select: { title: true } } },
+      select: {
+        assigneeId: true,
+        stepResults: true,
+        testCase: {
+          select: { title: true, steps: { select: { id: true } } },
+        },
+      },
     });
+
+    // Passing a case in the app settles the case, not its steps — so the
+    // report had nothing to show against each step and printed "N/A" for all
+    // of them. The Qase sync has always filled these in; runs executed here
+    // never did. Same rule, same marker, so the two agree: only when the case
+    // passed and nothing was stamped by hand.
+    let nextStepResults = stepResults;
+    if (status === "PASSED" && currentResult) {
+      const merged = {
+        ...((currentResult.stepResults as Record<string, any>) || {}),
+        ...((stepResults as Record<string, any>) || {}),
+      };
+      const changed = deriveStepVerdicts(
+        "PASSED",
+        merged,
+        (currentResult.testCase?.steps ?? []).map((s) => s.id),
+      );
+      if (changed) nextStepResults = merged;
+    }
 
     // Stamp who recorded the outcome — only when the status itself changes, so
     // editing a note later doesn't rewrite who ran the test.
@@ -82,7 +108,7 @@ export async function PATCH(
         timeSpent,
         errorMessage,
         comment,
-        stepResults,
+        stepResults: nextStepResults,
         assigneeId,
         ...(status
           ? { executedAt: new Date(), ...(executor ? { executedById: executor.id } : {}) }
