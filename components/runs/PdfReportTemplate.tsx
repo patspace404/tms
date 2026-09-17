@@ -936,15 +936,20 @@ export function PdfReportTemplate({
                               // of its steps passed every step. Applied here so
                               // reports already shared read correctly, without
                               // rewriting anyone's stored results.
+                              //
+                              // Whether a verdict was stamped by hand or
+                              // follows from the case result is an internal
+                              // distinction — the run screen marks it, this
+                              // report does not. The case passed, somebody's
+                              // name and the date are on it, and annotating
+                              // each step with how the verdict got there only
+                              // makes a sound result look doubtful.
                               const inferAll =
                                 res.status === "PASSED" &&
                                 !Object.values(
                                   res.stepResults || {},
                                 ).some((v: any) => v?.status);
                               const stepStatus = stepRes.status || (inferAll ? "PASSED" : null);
-                              const stepInferred =
-                                stepRes.derivedFrom === "case-result" ||
-                                (!stepRes.status && inferAll);
                               const isLastStep = idx === tc.steps.length - 1;
                               const stepBorderBottom =
                                 isLastStep && globalElements.length === 0
@@ -1034,21 +1039,7 @@ export function PdfReportTemplate({
                                     >
                                       Status:{" "}
                                       {stepStatus ? (
-                                        <>
-                                          {stepStatus}
-                                          {stepInferred && (
-                                            <span
-                                              style={{
-                                                fontWeight: "400",
-                                                textTransform: "none",
-                                                color: "#94a3b8",
-                                              }}
-                                            >
-                                              {" "}
-                                              · inferred from the case result
-                                            </span>
-                                          )}
-                                        </>
+                                        stepStatus
                                       ) : (
                                         // "N/A" reads like something went
                                         // wrong. Nothing did: no one recorded a
