@@ -75,7 +75,7 @@ export default function PublicReportPage({
   return (
     <div className="min-h-screen bg-background transition-colors">
       {/* public top bar */}
-      <div className="flex items-center gap-[10px] px-[22px] py-[13px] bg-surface border-b border-border">
+      <div className="qm-no-print flex items-center gap-[10px] px-[22px] py-[13px] bg-surface border-b border-border">
         <div className="w-[24px] h-[24px] rounded-[7px] bg-primary flex items-center justify-center shrink-0">
           <Radar size={16} className="text-primary-foreground" />
         </div>
@@ -95,7 +95,7 @@ export default function PublicReportPage({
       </div>
 
       <div className="flex flex-col items-center py-10 px-4">
-        <div className="w-full max-w-[1000px] mb-5 flex justify-between items-center">
+        <div className="qm-no-print w-full max-w-[1000px] mb-5 flex justify-between items-center">
           <div className="flex items-center space-x-2.5">
             <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
@@ -124,7 +124,7 @@ export default function PublicReportPage({
 
         <div
           onClick={handleImageClick}
-          className="w-full max-w-[1000px] bg-surface shadow-[var(--shadow-float)] rounded-[13px] overflow-hidden border border-border/80 animate-in zoom-in-95 duration-300 [&_img[alt='Evidence']]:cursor-zoom-in"
+          className="qm-print-surface w-full max-w-[1000px] bg-surface shadow-[var(--shadow-float)] rounded-[13px] overflow-hidden border border-border/80 animate-in zoom-in-95 duration-300 [&_img[alt='Evidence']]:cursor-zoom-in"
         >
           <PdfReportTemplate
             run={run}

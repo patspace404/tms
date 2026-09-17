@@ -398,3 +398,67 @@ button:disabled {
     background-position: 200% center;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Printing a test run report.
+
+   The run screen and the public report page print the same component. On
+   screen the printable copy is hidden; when printing, everything else on the
+   page is hidden instead, so the sheet holds the report and nothing else.
+
+   Pagination is left to the browser: a real <thead> repeats on every page on
+   its own, which is what the old canvas exporter was redrawing by hand.
+--------------------------------------------------------------------------- */
+#qm-print-root {
+  display: none;
+}
+
+@media print {
+  body.qm-printing > *:not(#qm-print-root) {
+    display: none !important;
+  }
+
+  body.qm-printing #qm-print-root {
+    display: block;
+  }
+
+  /* The report is a document, not a screenshot of the app's theme. */
+  body.qm-printing {
+    background: #ffffff;
+  }
+
+  #qm-print-root thead {
+    display: table-header-group;
+  }
+
+  #qm-print-root tr,
+  #qm-print-root .page-break-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  #qm-print-root img {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+}
+
+/* The public report page prints the report it is already showing: drop the
+   page chrome and the card framing so the sheet matches the run export. */
+@media print {
+  .qm-no-print {
+    display: none !important;
+  }
+
+  .qm-print-surface {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    max-width: none !important;
+  }
+}

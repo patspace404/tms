@@ -1,6 +1,5 @@
 import React from "react";
 import { formatThaiTime } from "@/lib/utils";
-import { formatDuration } from "@/lib/format-duration";
 
 interface PdfReportTemplateProps {
   run: any;
@@ -30,10 +29,14 @@ export function PdfReportTemplate({
 
   const completionRate = total > 0 ? Math.round((passed / total) * 100) : 0;
 
-  const totalTimeSpent =
-    run.results?.reduce((sum: number, r: any) => sum + (r.timeSpent || 0), 0) ||
-    0;
-  const durationStr = formatDuration(totalTimeSpent, "0s");
+  // How long a run took is an internal matter — it says more about the tester's
+  // day than about the software, and it is not something to hand a customer.
+  // The count of defects raised is what a reader of this report actually wants.
+  const defectCount = new Set(
+    (run.results || []).flatMap((r: any) =>
+      (r.linkedIssues || []).map((i: any) => i.key || i.id),
+    ),
+  ).size;
 
   const userLabel = (u: any) =>
     u ? u.name || u.email?.split("@")[0] || "—" : "Unassigned";
@@ -179,7 +182,7 @@ export function PdfReportTemplate({
         <div
           style={{
             backgroundColor: "#f8fafc",
-            border: "1px solid var(--border-color)",
+            border: "1px solid #e2e8f0",
             borderRadius: "12px",
             padding: "24px",
             marginBottom: "40px",
@@ -216,7 +219,7 @@ export function PdfReportTemplate({
                   backgroundColor: "#ffffff",
                   padding: "16px",
                   borderRadius: "8px",
-                  border: "1px solid var(--border-color)",
+                  border: "1px solid #e2e8f0",
                   borderTop: "4px solid #64748b",
                 }}
               >
@@ -247,7 +250,7 @@ export function PdfReportTemplate({
                   backgroundColor: "#ffffff",
                   padding: "16px",
                   borderRadius: "8px",
-                  border: "1px solid var(--border-color)",
+                  border: "1px solid #e2e8f0",
                   borderTop: "4px solid #16a34a",
                 }}
               >
@@ -279,7 +282,7 @@ export function PdfReportTemplate({
                   backgroundColor: "#ffffff",
                   padding: "16px",
                   borderRadius: "8px",
-                  border: "1px solid var(--border-color)",
+                  border: "1px solid #e2e8f0",
                   borderTop: "4px solid #dc2626",
                 }}
               >
@@ -311,7 +314,7 @@ export function PdfReportTemplate({
                   backgroundColor: "#ffffff",
                   padding: "16px",
                   borderRadius: "8px",
-                  border: "1px solid var(--border-color)",
+                  border: "1px solid #e2e8f0",
                   borderTop: "4px solid #3b82f6",
                 }}
               >
@@ -325,7 +328,7 @@ export function PdfReportTemplate({
                     marginBottom: "4px",
                   }}
                 >
-                  Duration
+                  Defects
                 </span>
                 <span
                   style={{
@@ -334,7 +337,7 @@ export function PdfReportTemplate({
                     color: "#0f172a",
                   }}
                 >
-                  {durationStr}
+                  {defectCount}
                 </span>
               </div>
               <div
@@ -342,7 +345,7 @@ export function PdfReportTemplate({
                   backgroundColor: "#ffffff",
                   padding: "16px",
                   borderRadius: "8px",
-                  border: "1px solid var(--border-color)",
+                  border: "1px solid #e2e8f0",
                   borderTop: "4px solid #f59e0b",
                 }}
               >
@@ -374,7 +377,7 @@ export function PdfReportTemplate({
                   backgroundColor: "#ffffff",
                   padding: "16px",
                   borderRadius: "8px",
-                  border: "1px solid var(--border-color)",
+                  border: "1px solid #e2e8f0",
                   borderTop: "4px solid #94a3b8",
                 }}
               >
@@ -418,7 +421,7 @@ export function PdfReportTemplate({
                   height: "120px",
                   margin: "0 auto",
                   borderRadius: "50%",
-                  background: `conic-gradient(#16a34a ${completionRate}%, var(--border-color) 0)`,
+                  background: `conic-gradient(#16a34a ${completionRate}%, #e2e8f0 0)`,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -473,7 +476,7 @@ export function PdfReportTemplate({
                   height: "14px",
                   borderRadius: "8px",
                   overflow: "hidden",
-                  border: "1px solid var(--border-color)",
+                  border: "1px solid #e2e8f0",
                 }}
               >
                 {[
@@ -554,7 +557,7 @@ export function PdfReportTemplate({
               width: "100%",
               textAlign: "left",
               borderCollapse: "collapse",
-              border: "1px solid var(--border-color)",
+              border: "1px solid #e2e8f0",
               boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
             }}
           >
@@ -759,7 +762,7 @@ export function PdfReportTemplate({
                               style={{
                                 maxWidth: "100%",
                                 maxHeight: "200px",
-                                border: "1px solid var(--border-color)",
+                                border: "1px solid #e2e8f0",
                                 borderRadius: "4px",
                                 display: "block",
                               }}
@@ -840,7 +843,7 @@ export function PdfReportTemplate({
                     {/* Column 1: Test Case */}
                     <td
                       style={{
-                        border: "1px solid var(--border-color)",
+                        border: "1px solid #e2e8f0",
                         padding: "16px",
                         verticalAlign: "top",
                         width: "20%",
@@ -900,10 +903,6 @@ export function PdfReportTemplate({
                             {formatThaiTime(new Date(res.updatedAt))}
                           </div>
                         )}
-                        <div>
-                          <strong style={{ color: "#475569" }}>Time:</strong>{" "}
-                          {formatDuration(res.timeSpent || 0)}
-                        </div>
                       </div>
                     </td>
 
@@ -911,7 +910,7 @@ export function PdfReportTemplate({
                     <td
                       colSpan={3}
                       style={{
-                        border: "1px solid var(--border-color)",
+                        border: "1px solid #e2e8f0",
                         padding: "0",
                         verticalAlign: "top",
                         width: "80%",
@@ -935,7 +934,7 @@ export function PdfReportTemplate({
                               const stepBorderBottom =
                                 isLastStep && globalElements.length === 0
                                   ? "none"
-                                  : "1px solid var(--border-color)";
+                                  : "1px solid #e2e8f0";
 
                               return (
                                 <tr key={idx}>
@@ -943,7 +942,7 @@ export function PdfReportTemplate({
                                   <td
                                     style={{
                                       borderBottom: stepBorderBottom,
-                                      borderRight: "1px solid var(--border-color)",
+                                      borderRight: "1px solid #e2e8f0",
                                       padding: "16px",
                                       verticalAlign: "top",
                                       width: "31.25%",
@@ -975,7 +974,7 @@ export function PdfReportTemplate({
                                   <td
                                     style={{
                                       borderBottom: stepBorderBottom,
-                                      borderRight: "1px solid var(--border-color)",
+                                      borderRight: "1px solid #e2e8f0",
                                       padding: "16px",
                                       verticalAlign: "top",
                                       width: "31.25%",
@@ -1049,7 +1048,7 @@ export function PdfReportTemplate({
                                                   style={{
                                                     maxWidth: "100%",
                                                     maxHeight: "200px",
-                                                    border: "1px solid var(--border-color)",
+                                                    border: "1px solid #e2e8f0",
                                                     borderRadius: "4px",
                                                     display: "block",
                                                   }}
@@ -1169,7 +1168,7 @@ export function PdfReportTemplate({
           style={{
             marginTop: "40px",
             paddingTop: "20px",
-            borderTop: "1px solid var(--border-color)",
+            borderTop: "1px solid #e2e8f0",
             textAlign: "center",
             fontSize: "12px",
             color: "#94a3b8",

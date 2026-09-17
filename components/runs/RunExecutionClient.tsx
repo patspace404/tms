@@ -44,7 +44,7 @@ import { MAX_UPLOAD_BYTES, tooLargeMessage } from "@/lib/upload-limits";
 import { isDocumentUrl, isVideoUrl } from "@/lib/attachment-kind";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { createRoot } from "react-dom/client";
+import { createPortal } from "react-dom";
 import { PdfReportTemplate } from "./PdfReportTemplate";
 import { Button } from "@/components/ui/Button";
 import { formatThaiTime } from "@/lib/utils";
@@ -1502,182 +1502,70 @@ export default function RunExecutionClient({
   };
 
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [printing, setPrinting] = useState(false);
 
+  /**
+   * Export the run as a PDF.
+   *
+   * This used to rasterise the report with html2canvas and paste the bitmap
+   * into jsPDF, page-break maths and a hand-repeated table header included.
+   * html2canvas is from 2022 and cannot parse `oklch()`, which every colour
+   * token in this app is written in, so the output never did look like the
+   * report on screen.
+   *
+   * Printing the same component the public report page prints makes the two
+   * identical by construction, keeps the text selectable, and lets the browser
+   * do the pagination — including repeating the table header, which it does
+   * for a real <thead> on its own.
+   */
   const exportToPDF = async () => {
     setIsExportingPdf(true);
+    setPrinting(true);
     try {
-      const html2canvasModule = await import("html2canvas");
-      const html2canvas = html2canvasModule.default || html2canvasModule;
-      if (typeof html2canvas !== "function")
-        throw new Error("html2canvas is not a function");
-
-      const jsPdfModule = await import("jspdf");
-      const jsPDF = jsPdfModule.jsPDF || jsPdfModule.default;
-
-      const container = document.createElement("div");
-      container.style.position = "absolute";
-      container.style.left = "-9999px";
-      container.style.top = "0";
-      container.style.width = "1000px";
-      container.style.backgroundColor = "#ffffff";
-      document.body.appendChild(container);
-
-      const root = createRoot(container);
-      root.render(<PdfReportTemplate run={run} projectCode={projectCode} />);
-
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      const images = container.querySelectorAll("img");
-      await Promise.all(
-        Array.from(images).map((img) => {
-          if (img.complete) return Promise.resolve();
-          return new Promise((resolve) => {
-            img.onload = resolve;
-            img.onerror = resolve;
-          });
-        }),
-      );
-
-      // Find the table header to repeat on every page
-      const thead = container.querySelector("thead");
-      let headerHeightPx = 0;
-      let headerImgData: string | null = null;
-      let headerPdfHeight = 0;
-
-      if (thead) {
-        const theadRect = thead.getBoundingClientRect();
-        headerHeightPx = theadRect.height;
-
-        const headerCanvas = await html2canvas(thead as HTMLElement, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          backgroundColor: "#1e293b", // Matches thead background
-        });
-        headerImgData = headerCanvas.toDataURL("image/jpeg", 0.95);
-      }
-
-      // Find all rows to calculate page breaks
-      const trs = container.querySelectorAll(".page-break-avoid, tbody tr");
-      const pageHeightPx = (297 / 210) * 1000; // ~1414px
-      let currentLimit = pageHeightPx;
-      const sliceOffsets = [0];
-
-      trs.forEach((tr) => {
-        const rect = tr.getBoundingClientRect();
-        const containerRect = container.getBoundingClientRect();
-        const yTop = rect.top - containerRect.top;
-        const yBottom = rect.bottom - containerRect.top;
-
-        if (yBottom > currentLimit && yTop < currentLimit) {
-          // This element crosses the page boundary
-          // We break just before this element, so we push its top coordinate
-          const lastBreak = sliceOffsets[sliceOffsets.length - 1];
-          if (yTop > lastBreak + 100) {
-            sliceOffsets.push(yTop);
-            // Next page will have a header injected at the top, so we subtract its height
-            // from the available content area limit.
-            currentLimit = yTop + (pageHeightPx - headerHeightPx);
-          }
-        }
-      });
-
-      const canvas = await html2canvas(container, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: "#ffffff",
-      });
-
-      const imgData = canvas.toDataURL("image/jpeg", 0.95);
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-      });
-
-      const pdfWidth = pdf.internal.pageSize.getWidth(); // 210
-      const pdfHeight = pdf.internal.pageSize.getHeight(); // 297
-      const ratio = pdfWidth / canvas.width;
-
-      if (headerImgData && thead) {
-        // The header canvas width is scaled, so its height ratio is the same
-        headerPdfHeight = headerHeightPx * 2 * ratio;
-      }
-
-      for (let i = 0; i < sliceOffsets.length; i++) {
-        if (i > 0) pdf.addPage();
-
-        const sourceY = sliceOffsets[i] * 2; // scale is 2
-        let pdfY = -(sourceY * ratio);
-
-        if (i > 0 && headerImgData) {
-          // Shift content down by the header height
-          pdfY += headerPdfHeight;
-        }
-
-        pdf.addImage(imgData, "JPEG", 0, pdfY, pdfWidth, canvas.height * ratio);
-
-        if (i > 0 && headerImgData) {
-          // Hide the bleed-over content at the top
-          pdf.setFillColor(255, 255, 255);
-          pdf.rect(0, 0, pdfWidth, headerPdfHeight, "F");
-
-          // Draw the repeating header
-          pdf.addImage(headerImgData, "JPEG", 0, 0, pdfWidth, headerPdfHeight);
-        }
-
-        // Hide the overflow at the bottom to avoid showing cut rows
-        const nextSourceY =
-          i < sliceOffsets.length - 1 ? sliceOffsets[i + 1] * 2 : canvas.height;
-        let contentPdfHeight = (nextSourceY - sourceY) * ratio;
-
-        if (i > 0 && headerImgData) {
-          contentPdfHeight += headerPdfHeight;
-        }
-
-        if (contentPdfHeight < pdfHeight) {
-          pdf.setFillColor(255, 255, 255);
-          pdf.rect(
-            0,
-            contentPdfHeight,
-            pdfWidth,
-            pdfHeight - contentPdfHeight,
-            "F",
-          );
-        }
-      }
-
-      // Page numbers — "Page X of Y" centered in the bottom margin of each page
-      const totalPages = sliceOffsets.length;
-      for (let i = 0; i < totalPages; i++) {
-        pdf.setPage(i + 1);
-        pdf.setFontSize(8);
-        pdf.setTextColor(150, 150, 150);
-        pdf.text(
-          `Page ${i + 1} of ${totalPages}`,
-          pdfWidth / 2,
-          pdfHeight - 5,
-          { align: "center" },
+      // Let the template mount, then give its evidence images a chance to load
+      // so they are not blank in the printed copy.
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const root = document.getElementById("qm-print-root");
+      if (root) {
+        await Promise.all(
+          Array.from(root.querySelectorAll("img")).map((img) =>
+            img.complete
+              ? Promise.resolve()
+              : new Promise((resolve) => {
+                  img.onload = resolve;
+                  img.onerror = resolve;
+                }),
+          ),
         );
       }
+      document.body.classList.add("qm-printing");
 
-      const cleanTitle = run.title.replace(/[^a-z0-9]/gi, "_").toLowerCase();
-      const dateStr = new Date().toISOString().split("T")[0];
-      pdf.save(`run_${cleanTitle}_${dateStr}.pdf`);
-
-      root.unmount();
-      if (document.body.contains(container)) {
-        document.body.removeChild(container);
-      }
-
-      setIsExportModalOpen(false);
-      toast.success("PDF Report generated successfully");
-    } catch (err: any) {
-      console.error("Failed to generate PDF:", err);
-      toast.error(`Failed to generate PDF: ${err.message || String(err)}`);
+      // Tearing down on the next line would be a race: window.print() blocks
+      // until the dialog closes in most browsers, but not all of them. Waiting
+      // for afterprint means the report is never pulled out from under a
+      // dialog that is still open.
+      await new Promise<void>((resolve) => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          window.removeEventListener("afterprint", finish);
+          resolve();
+        };
+        window.addEventListener("afterprint", finish);
+        window.print();
+        // Browsers that do block have already printed by now; those that fire
+        // afterprint get there first and this does nothing.
+        setTimeout(finish, 1000);
+      });
+    } catch (err) {
+      console.error("Failed to print the report:", err);
+      toast.error("Could not open the print dialog");
     } finally {
+      document.body.classList.remove("qm-printing");
+      setPrinting(false);
       setIsExportingPdf(false);
+      setIsExportModalOpen(false);
     }
   };
 
@@ -2185,6 +2073,16 @@ export default function RunExecutionClient({
             </div>
           </div>
         )}
+
+        {/* The printable report. Portalled to <body> so the print stylesheet
+            can hide everything except this, and hidden on screen. */}
+        {printing &&
+          createPortal(
+            <div id="qm-print-root">
+              <PdfReportTemplate run={run} projectCode={projectCode} />
+            </div>,
+            document.body,
+          )}
 
         {/* Export Modal */}
         {isExportModalOpen && (
