@@ -1037,23 +1037,13 @@ export function PdfReportTemplate({
                                         marginBottom: "4px",
                                       }}
                                     >
-                                      Status:{" "}
-                                      {stepStatus ? (
-                                        stepStatus
-                                      ) : (
-                                        // "N/A" reads like something went
-                                        // wrong. Nothing did: no one recorded a
-                                        // verdict for this step.
-                                        <span
-                                          style={{
-                                            fontWeight: "400",
-                                            textTransform: "none",
-                                            color: "#94a3b8",
-                                          }}
-                                        >
-                                          not recorded
-                                        </span>
-                                      )}
+                                      {/* No verdict, nothing to say. The label
+                                          is dropped with the value rather than
+                                          left standing over a blank — "N/A" or
+                                          "not recorded" both draw the eye to an
+                                          absence that means nothing to a
+                                          reader. */}
+                                      {stepStatus ? <>Status: {stepStatus}</> : null}
                                     </div>
                                     {stepRes.actualResult && (
                                       <div

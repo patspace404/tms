@@ -1032,6 +1032,34 @@ export default function RunExecutionClient({
         opened?.id === resultId ? Math.min(Date.now() - opened.at, 60 * 60 * 1000) : null;
       const timeSpent = elapsed !== null && elapsed >= 1000 ? elapsed : undefined;
 
+      // Pressing Pass settles the whole case, so its steps follow the button
+      // rather than sitting on "—" until someone reloads. The server applies
+      // the same rule; this is so the screen agrees with it immediately.
+      //
+      // Only when no step was stamped by hand: a half-marked case is somebody
+      // mid-way through, and overwriting that would throw away their work.
+      const target = run?.results?.find((r: any) => r.id === resultId);
+      const steps = target?.testCase?.steps ?? [];
+      const existingSteps: Record<string, any> = target?.stepResults || {};
+      const shouldDerive =
+        status === "PASSED" &&
+        steps.length > 0 &&
+        !Object.values(existingSteps).some((v: any) => v?.status);
+
+      const derivedSteps = shouldDerive
+        ? steps.reduce(
+            (acc: Record<string, any>, s: any) => {
+              acc[s.id] = {
+                ...(existingSteps[s.id] || {}),
+                status: "PASSED",
+                derivedFrom: "case-result",
+              };
+              return acc;
+            },
+            { ...existingSteps },
+          )
+        : null;
+
       setRun((prev: any) => {
         const updatedResults = prev.results.map((r: any) =>
           r.id === resultId
@@ -1040,12 +1068,17 @@ export default function RunExecutionClient({
                 status,
                 executedAt: now,
                 executedBy: me ?? r.executedBy,
+                ...(derivedSteps ? { stepResults: derivedSteps } : {}),
                 ...(timeSpent !== undefined ? { timeSpent } : {}),
               }
             : r,
         );
         return { ...prev, results: updatedResults };
       });
+
+      if (derivedSteps && resultId === activeResultId) {
+        setStepResults(derivedSteps);
+      }
 
       // Restart the clock so a second verdict on the same case measures afresh
       // rather than accumulating from when it was first opened.
