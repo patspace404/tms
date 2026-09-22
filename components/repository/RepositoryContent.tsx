@@ -48,6 +48,8 @@ interface RepositoryContentProps {
   suites: any[];
   cases: any[];
   activeSuiteId: string | null;
+  /** Open this case on first render — set by a ?case= link. */
+  initialCaseId?: string | null;
   totalCases?: number;
   totalSuites?: number;
 }
@@ -57,12 +59,13 @@ export function RepositoryContent({
   suites,
   cases,
   activeSuiteId,
+  initialCaseId,
   totalCases,
   totalSuites,
 }: RepositoryContentProps) {
   const router = useRouter();
   const { role } = useProjectRole();
-  const [activeTestCaseId, setActiveTestCaseId] = useState<string | null>(null);
+  const [activeTestCaseId, setActiveTestCaseId] = useState<string | null>(initialCaseId ?? null);
   const [detailTab, setDetailTab] = useState<
     "general" | "defects" | "comments" | "history"
   >("general");

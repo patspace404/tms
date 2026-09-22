@@ -14,10 +14,14 @@ export default async function RepositoryPage({
 }) {
   const { code } = await params;
   const resolvedSearchParams = await searchParams;
-  const activeSuiteId =
+  const suiteParam =
     typeof resolvedSearchParams.suite === "string"
       ? resolvedSearchParams.suite
       : null;
+  // ?case= opens one case straight away — the QA monitor dashboards link here
+  // with the sequence number a tester quotes ("the 42 in STSD-42"); a uuid works too.
+  const caseParam =
+    typeof resolvedSearchParams.case === "string" ? resolvedSearchParams.case : null;
 
   let cases: any[] = [];
   let suites: any[] = [];
@@ -48,6 +52,15 @@ export default async function RepositoryPage({
     console.error("Failed to fetch cases:", err);
   }
 
+  const seq = Number(caseParam);
+  const targetCase = caseParam
+    ? cases.find((c) =>
+        Number.isInteger(seq) && seq > 0 ? c.sequenceNumber === seq : c.id === caseParam,
+      )
+    : undefined;
+  // A link that names a case but no suite still lands on the list that holds it.
+  const activeSuiteId = suiteParam ?? targetCase?.suiteId ?? null;
+
   const allSuiteIds = suites.map((s) => s.id);
 
   return (
@@ -66,6 +79,7 @@ export default async function RepositoryPage({
             suites={suites}
             cases={cases}
             activeSuiteId={activeSuiteId}
+            initialCaseId={targetCase?.id ?? null}
             totalCases={cases.length}
             totalSuites={suites.length}
           />
