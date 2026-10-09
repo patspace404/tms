@@ -48,6 +48,7 @@ Lists are paginated with `?limit=` (max 100) and `?offset=`:
 | 404 | Not found, or not visible to this token |
 | 409 | Conflict — e.g. submitting a result to a run that is not ACTIVE |
 | 413 | Upload exceeds 50 MB |
+| 400 | A field in the body is not one this endpoint accepts |
 | 422 | Validation failed |
 
 ## Endpoints
@@ -87,6 +88,23 @@ Sending `steps` on PATCH replaces the whole list.
 
 Omit `cases` when creating a run to include every case in the project.
 
+**Changing which cases a run holds.** `PATCH /run/{code}/{id}` takes either:
+
+| Field | Meaning |
+| --- | --- |
+| `cases` | The full list the run should end up with. Anything missing is removed. |
+| `add_cases` / `remove_cases` | A change relative to what is there now. |
+
+Send one form or the other, not both. The run must be `ACTIVE`. Removing a case
+discards the result recorded against it, so a case that is anything other than
+`IN_PROGRESS` needs `"force": true`; without it the response names the cases and
+refuses. The reply reports what happened:
+
+```jsonc
+{ "status": true, "result": { "id": "...", "cases": {
+    "added": ["..."], "removed": [], "already_present": ["..."], "not_in_run": [] } } }
+```
+
 ### Results
 | Method | Path |
 | --- | --- |
@@ -99,6 +117,54 @@ A run is created with a result row per case, so submitting **updates** that row.
 Re-reporting a case overwrites it, which is what a CI retry should do. A case
 that is not in the run is rejected rather than added, so a typo'd id surfaces
 instead of quietly skewing the run's totals.
+
+**Result body**
+
+| Field | Notes |
+| --- | --- |
+| `case_id` | Required. Uuid or sequence number. `case` is an alias. |
+| `status` | Required. One of the statuses above. |
+| `comment`, `error_message` | Free text. |
+| `time_spent_ms` | Milliseconds. `time_ms` is an alias. |
+| `assignee_id` | Who ran the test. See below. |
+| `steps` | Per-step outcomes. See below. |
+
+**Crediting the result to someone else.** Without `assignee_id` the result is
+assigned to the token's own user, which is wrong when a script is moving work
+that belongs to other people. Setting it to another user requires **ADMIN** on
+the project; any token may set it to its own user. The id must belong to someone
+on the project — `GET /member/{code}` lists them.
+
+**Steps.** Target a step by `step_id` (preferred) or by `position`; with neither,
+entries are taken in array order. `GET` returns them in the case's own order with
+`position` on each, so a read can be written straight back.
+
+```jsonc
+{ "case_id": 42, "status": "PASSED", "assignee_id": "uuid-of-the-tester",
+  "steps": [
+    { "step_id": "uuid-of-step-2", "status": "PASSED", "actual_result": "HTTP 200" },
+    { "step_id": "uuid-of-step-1", "status": null }   // null clears the verdict
+  ] }
+```
+
+A step's `status` behaves as follows:
+
+| Sent | Effect |
+| --- | --- |
+| omitted | Left as it was |
+| a status | Set |
+| `null` or `"UNTESTED"` | Cleared, back to untested. Notes and evidence stay |
+
+### Members
+| Method | Path |
+| --- | --- |
+| GET | `/member/{code}` — who is on the project, with the ids `assignee_id` takes |
+
+### Unrecognised fields
+
+A field this API does not act on is rejected with **400**, naming it and listing
+what the endpoint does accept. It is never accepted and ignored: a 2xx means the
+change was applied.
 
 ### Milestones / Plans / Environments / Defects
 | Method | Path |

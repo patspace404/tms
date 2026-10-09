@@ -83,6 +83,43 @@ export function serializeRun(r: any) {
   };
 }
 
+/**
+ * Step outcomes in the order the case runs them.
+ *
+ * `res.testCase.steps` is the authority on order; when a caller fetched the
+ * result without it, fall back to the stored keys so the field is never empty —
+ * unordered is still better than missing, and `position` is then omitted rather
+ * than guessed.
+ */
+function serializeStepResults(res: any) {
+  const stored = (res.stepResults ?? {}) as Record<string, any>;
+  const entry = (stepId: string, position: number | null) => {
+    const v = stored[stepId];
+    return {
+      step_id: stepId,
+      position,
+      status: v?.status ?? null,
+      actual_result: v?.actualResult ?? null,
+      attachments: (v?.attachments ?? []).map((a: any) => ({ name: a.name, url: a.url })),
+    };
+  };
+
+  const ordered: { id: string; position: number }[] = res.testCase?.steps ?? [];
+  if (ordered.length === 0) {
+    return Object.keys(stored).map((id) => entry(id, null));
+  }
+
+  const known = new Set(ordered.map((s) => s.id));
+  return [
+    ...ordered.map((s, i) => entry(s.id, typeof s.position === "number" ? s.position : i)),
+    // Outcomes whose step no longer exists — editing a case replaces its step
+    // rows. Kept rather than dropped so nothing recorded disappears silently.
+    ...Object.keys(stored)
+      .filter((id) => !known.has(id))
+      .map((id) => entry(id, null)),
+  ];
+}
+
 export function serializeResult(res: any) {
   return {
     id: res.id,
@@ -94,14 +131,12 @@ export function serializeResult(res: any) {
     error_message: res.errorMessage ?? null,
     // Per-step outcomes, keyed by step id in storage; flattened to a list here
     // so clients don't have to care about the internal keying.
-    steps: res.stepResults
-      ? Object.entries(res.stepResults as Record<string, any>).map(([stepId, v]) => ({
-          step_id: stepId,
-          status: v?.status ?? null,
-          actual_result: v?.actualResult ?? null,
-          attachments: (v?.attachments ?? []).map((a: any) => ({ name: a.name, url: a.url })),
-        }))
-      : undefined,
+    //
+    // Ordered by the case's own step order, and carrying `position`, because
+    // the list used to come back in whatever order the JSON object happened to
+    // be keyed. A client that read it and wrote it straight back landed each
+    // value on a different step, with nothing to indicate it had happened.
+    steps: res.stepResults ? serializeStepResults(res) : undefined,
     attachments: res.attachments?.map((a: any) => ({
       id: a.id,
       name: a.originalName,

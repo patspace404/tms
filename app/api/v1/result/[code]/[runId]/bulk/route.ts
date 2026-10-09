@@ -1,7 +1,15 @@
 import { prisma } from "@/lib/prisma";
-import { fail, handler, ok, readJson, requireProject, WRITE_ROLES } from "@/lib/api-v1";
+import {
+  fail,
+  handler,
+  ok,
+  readJson,
+  rejectUnknownFields,
+  requireProject,
+  WRITE_ROLES,
+} from "@/lib/api-v1";
 import { NextResponse } from "next/server";
-import { applyResult, RESULT_STATUSES, ResultPayload } from "../apply";
+import { applyResult, RESULT_FIELDS, RESULT_STATUSES, ResultPayload } from "../apply";
 
 // POST /api/v1/result/{code}/{runId}/bulk — submit a whole suite run in one call
 // Body: { results: [ { case_id, status, ... }, ... ] }
@@ -23,6 +31,8 @@ export const POST = handler(async (req, { params }) => {
   }
 
   const body = await readJson<{ results?: ResultPayload[] }>(req);
+  const unknownTop = rejectUnknownFields(body as Record<string, unknown>, ["results"]);
+  if (unknownTop) return unknownTop;
   const items = body?.results;
   if (!Array.isArray(items) || items.length === 0) {
     return fail("'results' must be a non-empty array.", 422);
@@ -35,6 +45,19 @@ export const POST = handler(async (req, { params }) => {
   const errors: { index: number; case_id: unknown; error: string }[] = [];
 
   for (const [index, item] of items.entries()) {
+    // Per item, so one mistyped field names itself instead of failing the batch.
+    const unknown = Object.keys(item ?? {}).filter(
+      (k) => !(RESULT_FIELDS as readonly string[]).includes(k),
+    );
+    if (unknown.length) {
+      errors.push({
+        index,
+        case_id: item?.case_id ?? item?.case ?? null,
+        error: `Unrecognised field${unknown.length > 1 ? "s" : ""}: ${unknown.join(", ")}.`,
+      });
+      continue;
+    }
+
     const status = String(item?.status ?? "").toUpperCase();
     if (!RESULT_STATUSES.includes(status)) {
       errors.push({
@@ -45,7 +68,10 @@ export const POST = handler(async (req, { params }) => {
       continue;
     }
 
-    const outcome = await applyResult(ctx.projectId, run.id, item, ctx.actor.userId);
+    const outcome = await applyResult(ctx.projectId, run.id, item, {
+      executedById: ctx.actor.userId,
+      role: ctx.role,
+    });
     if ("error" in outcome) {
       errors.push({ index, case_id: item?.case_id ?? item?.case ?? null, error: outcome.error });
     } else {

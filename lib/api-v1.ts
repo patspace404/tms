@@ -81,6 +81,29 @@ export async function requireProject(
 export const READ_ROLES: ProjectRole[] = ["VIEWER", "EDITOR", "ADMIN"];
 export const WRITE_ROLES: ProjectRole[] = ["EDITOR", "ADMIN"];
 
+/**
+ * Reject a body carrying fields this endpoint does not act on.
+ *
+ * Accepting a field and then ignoring it is the worst of both: the caller gets
+ * a 2xx and believes the change landed. A migration was written against
+ * `assignee_id`, `assigned_to`, `user_id` and `author_id` in turn — every one
+ * answered 201, none of them did anything — and the names ended up wrong on
+ * 725 results before anybody noticed. Saying "I don't know that field" costs
+ * one request; silence costs a day.
+ */
+export function rejectUnknownFields(
+  body: Record<string, unknown> | null | undefined,
+  allowed: readonly string[],
+): NextResponse | null {
+  const unknown = Object.keys(body ?? {}).filter((k) => !allowed.includes(k));
+  if (unknown.length === 0) return null;
+  return fail(
+    `Unrecognised field${unknown.length > 1 ? "s" : ""}: ${unknown.join(", ")}. ` +
+      `This endpoint accepts: ${[...allowed].sort().join(", ")}.`,
+    400,
+  );
+}
+
 /** Parse a JSON body, returning null when absent or malformed. */
 export async function readJson<T = any>(req: Request): Promise<T | null> {
   try {

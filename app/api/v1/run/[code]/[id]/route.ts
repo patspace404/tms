@@ -6,6 +6,7 @@ import {
   ok,
   readJson,
   READ_ROLES,
+  rejectUnknownFields,
   requireProject,
   WRITE_ROLES,
 } from "@/lib/api-v1";
@@ -56,18 +57,62 @@ export const PATCH = handler(async (req, { params }) => {
   const body = await readJson<any>(req);
   if (!body) return fail("A JSON body is required.", 422);
 
+  const PATCH_FIELDS = [
+    "title",
+    "description",
+    "status",
+    "cases",
+    "add_cases",
+    "remove_cases",
+    "force",
+  ] as const;
+  const unknown = rejectUnknownFields(body, PATCH_FIELDS);
+  if (unknown) return unknown;
+
   const STATUSES = ["ACTIVE", "COMPLETED", "ABORTED"];
   if (body.status && !STATUSES.includes(String(body.status).toUpperCase())) {
     return fail(`'status' must be one of: ${STATUSES.join(", ")}.`, 422);
   }
 
-  for (const field of ["add_cases", "remove_cases"] as const) {
+  for (const field of ["cases", "add_cases", "remove_cases"] as const) {
     if (body[field] !== undefined && !Array.isArray(body[field])) {
       return fail(`'${field}' must be an array of case uuids or sequence numbers.`, 422);
     }
   }
-  const toAdd: unknown[] = body.add_cases ?? [];
-  const toRemove: unknown[] = body.remove_cases ?? [];
+  if (body.cases !== undefined && (body.add_cases !== undefined || body.remove_cases !== undefined)) {
+    return fail(
+      "Send either 'cases' (the full list the run should hold) or " +
+        "'add_cases'/'remove_cases' (a change to it), not both.",
+      422,
+    );
+  }
+
+  // `cases` is the whole list the run should end up with. It used to be
+  // accepted and ignored: PATCH answered 200, the run was untouched, and a
+  // caller watching stats.total saw it stay at 2 with nothing to explain why.
+  const declarative = Array.isArray(body.cases);
+  let toAdd: unknown[] = body.add_cases ?? [];
+  let toRemove: unknown[] = body.remove_cases ?? [];
+
+  const current = await prisma.testRunResult.findMany({
+    where: { runId: id },
+    select: { caseId: true },
+  });
+
+  if (declarative) {
+    const wanted = await resolveCaseRefs(ctx.projectId, body.cases);
+    if (wanted.unresolved.length) {
+      return fail(
+        `These 'cases' do not exist in this project: ${wanted.unresolved.join(", ")}.`,
+        422,
+      );
+    }
+    const want = new Set(wanted.ids);
+    const have = new Set(current.map((r) => r.caseId));
+    toAdd = wanted.ids.filter((c) => !have.has(c));
+    toRemove = [...have].filter((c) => !want.has(c));
+  }
+
   const amending = toAdd.length > 0 || toRemove.length > 0;
 
   // A run's case list is only meaningful while the run is open. Amending a
@@ -96,14 +141,7 @@ export const PATCH = handler(async (req, { params }) => {
       );
     }
 
-    const present = new Set(
-      (
-        await prisma.testRunResult.findMany({
-          where: { runId: id },
-          select: { caseId: true },
-        })
-      ).map((r) => r.caseId),
-    );
+    const present = new Set(current.map((r) => r.caseId));
 
     // Adding a case already in the run is a no-op rather than an error, so a
     // caller can re-send the same amendment without having to diff it first.
