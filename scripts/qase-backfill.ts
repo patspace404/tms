@@ -33,6 +33,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { qaseList } from "@/lib/qase/client";
+import { qaseSyncEnabled } from "@/lib/qase/enabled";
 import {
   relinkOrphanSuites,
   syncCase,
@@ -161,6 +162,15 @@ async function backfillProject(projectId: string, code: string, qaseCode: string
 }
 
 async function main() {
+  if (!qaseSyncEnabled()) {
+    console.error(
+      "\n✗ Qase sync is turned off. Set QASE_SYNC_ENABLED=true to run this.\n" +
+        "  It was turned off because the nightly run kept importing suites and\n" +
+        "  cases on top of work the team had already done in QMaster.\n",
+    );
+    process.exit(1);
+  }
+
   if (!process.env.QASE_TOKEN) {
     console.error("\n✗ QASE_TOKEN is not set.\n");
     process.exit(1);

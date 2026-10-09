@@ -13,6 +13,7 @@
 import { after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { entityIdOf, handleQaseEvent, verifySecret, type QaseEnvelope } from "@/lib/qase/webhook";
+import { QASE_SYNC_DISABLED_MESSAGE, qaseSyncEnabled } from "@/lib/qase/enabled";
 
 export async function POST(request: Request) {
   if (!verifySecret(request.headers.get("x-qase-secret"))) {
@@ -36,6 +37,25 @@ export async function POST(request: Request) {
     },
     select: { id: true },
   });
+
+  // With sync off the delivery is still kept — it is the record of what Qase
+  // would have sent, and it can be replayed if the switch is ever turned back
+  // on — but nothing is written to the project. 202 either way, so Qase does
+  // not sit there retrying a request that was received perfectly well.
+  if (!qaseSyncEnabled()) {
+    await prisma.qaseWebhookEvent.update({
+      where: { id: event.id },
+      data: {
+        status: "SKIPPED",
+        message: QASE_SYNC_DISABLED_MESSAGE,
+        processedAt: new Date(),
+      },
+    });
+    return Response.json(
+      { status: true, result: { received: event.id, applied: false } },
+      { status: 202 },
+    );
+  }
 
   // Qase is waiting: acknowledge now, sync (which downloads attachments) after.
   after(async () => {
@@ -69,6 +89,9 @@ export async function GET() {
       method: "POST",
       header: "X-Qase-Secret",
       configured: Boolean(process.env.QASE_WEBHOOK_SECRET),
+      // So "is Qase still writing to us?" can be answered without reading env
+      // on the box.
+      syncEnabled: qaseSyncEnabled(),
     },
   });
 }
