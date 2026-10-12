@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { requireProjectRole } from "@/lib/project-auth";
+import { allocateSequenceNumber } from "@/lib/case-sequence";
 
 export async function POST(
   req: Request,
@@ -80,30 +81,40 @@ export async function POST(
       // Clone Test Cases if strategy is cases_and_suites
       if (strategy === "cases_and_suites") {
         for (const tc of sourceSuite.testCases) {
-          await prisma.testCase.create({
-            data: {
-              title: tc.title,
-              description: tc.description,
-              preconditions: tc.preconditions,
-              postconditions: tc.postconditions,
-              priority: tc.priority,
-              severity: tc.severity,
-              automationStatus: tc.automationStatus,
-              projectId: project!.id,
-              suiteId: newSuite.id,
-              authorId: (session!.user as any).id,
-              steps: {
-                create: tc.steps.map((step) => ({
-                  action: step.action,
-                  expectedResult: step.expectedResult,
-                  position: step.position,
-                  sharedStepId: step.sharedStepId,
-                })),
+          // Same as the bulk case clone: without a number of its own every
+          // copy took the column default of 0, so a suite holding more than
+          // one case could never be cloned.
+          await prisma.$transaction(async (tx) => {
+            const sequenceNumber = await allocateSequenceNumber(
+              tx,
+              project!.id,
+            );
+            await tx.testCase.create({
+              data: {
+                sequenceNumber,
+                title: tc.title,
+                description: tc.description,
+                preconditions: tc.preconditions,
+                postconditions: tc.postconditions,
+                priority: tc.priority,
+                severity: tc.severity,
+                automationStatus: tc.automationStatus,
+                projectId: project!.id,
+                suiteId: newSuite.id,
+                authorId: (session!.user as any).id,
+                steps: {
+                  create: tc.steps.map((step) => ({
+                    action: step.action,
+                    expectedResult: step.expectedResult,
+                    position: step.position,
+                    sharedStepId: step.sharedStepId,
+                  })),
+                },
+                tags: {
+                  connect: tc.tags.map((tag) => ({ id: tag.id })),
+                },
               },
-              tags: {
-                connect: tc.tags.map((tag) => ({ id: tag.id })),
-              },
-            },
+            });
           });
         }
       }

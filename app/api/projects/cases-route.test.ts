@@ -80,9 +80,11 @@ describe("project cases API route", () => {
             title: validCaseBody.title,
             sequenceNumber: 8,
           }),
-          // allocateSequenceNumber checks the highest row before trusting the counter
-          aggregate: vi.fn().mockResolvedValue({ _max: { sequenceNumber: 7 } }),
         },
+        // allocateSequenceNumber checks the highest row before trusting the
+        // counter, and reads it raw so cases in the trash are counted too —
+        // they keep their number, and the unique constraint still sees them.
+        $queryRaw: vi.fn().mockResolvedValue([{ max: 7 }]),
       }),
     );
   });

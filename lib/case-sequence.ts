@@ -30,9 +30,10 @@ type SequenceTx = {
   project: {
     update: (args: any) => Promise<any>;
   };
-  testCase: {
-    aggregate: (args: any) => Promise<any>;
-  };
+  $queryRaw: <T = unknown>(
+    query: TemplateStringsArray,
+    ...values: any[]
+  ) => Promise<T>;
 };
 
 export async function allocateSequenceNumber(
@@ -45,11 +46,16 @@ export async function allocateSequenceNumber(
     select: { caseSequence: true },
   });
 
-  const { _max } = await tx.testCase.aggregate({
-    where: { projectId },
-    _max: { sequenceNumber: true },
-  });
-  const afterHighestRow = (_max.sequenceNumber ?? 0) + 1;
+  // Raw, because the soft-delete filter in lib/prisma.ts rewrites the `where`
+  // of every testCase read and would hide trashed cases from this one. They
+  // still hold their numbers in the table and the unique constraint does not
+  // care that a row is in the trash, so counting only live cases would hand
+  // back a number that already exists the moment someone deletes the newest
+  // case. Still on `tx`, so the project row stays locked across both steps.
+  const rows = await tx.$queryRaw<{ max: number | null }[]>`
+    SELECT MAX("sequenceNumber") AS max FROM "TestCase" WHERE "projectId" = ${projectId}
+  `;
+  const afterHighestRow = Number(rows[0]?.max ?? 0) + 1;
 
   if (afterHighestRow <= caseSequence) return caseSequence;
 

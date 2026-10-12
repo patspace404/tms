@@ -6,12 +6,19 @@ const testCaseMock = vi.hoisted(() => ({ create: vi.fn() }));
 const sessionMock = vi.hoisted(() => ({ getServerSession: vi.fn() }));
 const requireProjectRoleMock = vi.hoisted(() => vi.fn());
 
+// Each cloned case now takes a number of its own, inside a transaction.
+const txMock = vi.hoisted(() => vi.fn());
+
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     project: projectMock,
     testSuite: testSuiteMock,
     testCase: testCaseMock,
+    $transaction: txMock,
   },
+}));
+vi.mock("@/lib/case-sequence", () => ({
+  allocateSequenceNumber: vi.fn(async () => 7),
 }));
 vi.mock("next-auth/next", () => ({ getServerSession: sessionMock.getServerSession }));
 vi.mock("@/lib/project-auth", () => ({ requireProjectRole: requireProjectRoleMock }));
@@ -57,6 +64,9 @@ const mockCreatedSuite = { id: "new-suite", title: "Auth" };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  txMock.mockImplementation(async (fn: any) =>
+    fn({ testCase: testCaseMock, project: projectMock, $queryRaw: vi.fn() }),
+  );
 });
 
 describe("POST /api/projects/[code]/suites/[suiteId]/clone", () => {

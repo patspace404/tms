@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { requireProjectRole } from "@/lib/project-auth";
+import { allocateSequenceNumber } from "@/lib/case-sequence";
 
 export async function POST(
   req: Request,
@@ -70,35 +71,47 @@ export async function POST(
     }
 
     // Duplicate logic
+    //
+    // Each clone needs its own case number. Leaving it out meant every clone
+    // was created with the column default of 0, so the second one in a project
+    // collided on @@unique([projectId, sequenceNumber]) and the whole clone
+    // failed with "Failed to clone test cases" — nothing in the message said
+    // which part went wrong.
     let clonedCount = 0;
     for (const originalCase of originalCases) {
-      const clonedCase = await prisma.testCase.create({
-        data: {
-          title: originalCase.title,
-          description: originalCase.description,
-          preconditions: originalCase.preconditions,
-          postconditions: originalCase.postconditions,
-          priority: originalCase.priority,
-          severity: originalCase.severity,
-          automationStatus: originalCase.automationStatus,
-          automationScript: originalCase.automationScript,
-          customFields: originalCase.customFields || undefined,
-          projectId: project.id,
-          suiteId:
-            destinationId !== undefined ? destinationId : originalCase.suiteId,
-          authorId: (session.user as any).id,
-          tags: {
-            connect: originalCase.tags.map((tag) => ({ id: tag.id })),
+      await prisma.$transaction(async (tx) => {
+        const sequenceNumber = await allocateSequenceNumber(tx, project.id);
+        await tx.testCase.create({
+          data: {
+            sequenceNumber,
+            title: originalCase.title,
+            description: originalCase.description,
+            preconditions: originalCase.preconditions,
+            postconditions: originalCase.postconditions,
+            priority: originalCase.priority,
+            severity: originalCase.severity,
+            automationStatus: originalCase.automationStatus,
+            automationScript: originalCase.automationScript,
+            customFields: originalCase.customFields || undefined,
+            projectId: project.id,
+            suiteId:
+              destinationId !== undefined
+                ? destinationId
+                : originalCase.suiteId,
+            authorId: (session.user as any).id,
+            tags: {
+              connect: originalCase.tags.map((tag) => ({ id: tag.id })),
+            },
+            steps: {
+              create: originalCase.steps.map((step) => ({
+                action: step.action,
+                expectedResult: step.expectedResult,
+                sharedStepId: step.sharedStepId,
+                position: step.position,
+              })),
+            },
           },
-          steps: {
-            create: originalCase.steps.map((step) => ({
-              action: step.action,
-              expectedResult: step.expectedResult,
-              sharedStepId: step.sharedStepId,
-              position: step.position,
-            })),
-          },
-        },
+        });
       });
       clonedCount++;
     }

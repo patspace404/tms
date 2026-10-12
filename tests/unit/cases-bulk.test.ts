@@ -10,8 +10,19 @@ const softDeleteCasesMock = vi.hoisted(() => vi.fn());
 const sessionMock = vi.hoisted(() => ({ getServerSession: vi.fn() }));
 const requireProjectRoleMock = vi.hoisted(() => vi.fn());
 
+// The clone runs in a transaction and allocates a case number, so the mock has
+// to offer both. $transaction just hands the same client back.
+const txMock = vi.hoisted(() => vi.fn());
+
 vi.mock("@/lib/prisma", () => ({
-  prisma: { project: projectMock, testCase: testCaseMock },
+  prisma: {
+    project: projectMock,
+    testCase: testCaseMock,
+    $transaction: txMock,
+  },
+}));
+vi.mock("@/lib/case-sequence", () => ({
+  allocateSequenceNumber: vi.fn(async () => 42),
 }));
 vi.mock("next-auth/next", () => ({ getServerSession: sessionMock.getServerSession }));
 vi.mock("@/lib/project-auth", () => ({ requireProjectRole: requireProjectRoleMock }));
@@ -49,6 +60,9 @@ describe("DELETE /api/projects/[code]/cases/bulk", () => {
     vi.clearAllMocks();
     projectMock.findFirst.mockResolvedValue(fakeProject);
     requireProjectRoleMock.mockResolvedValue(true);
+    txMock.mockImplementation(async (fn: any) =>
+      fn({ testCase: testCaseMock, project: projectMock, $queryRaw: vi.fn() }),
+    );
   });
 
   it("returns 401 when not authenticated", async () => {
