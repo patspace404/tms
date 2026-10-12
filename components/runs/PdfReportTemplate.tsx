@@ -756,12 +756,18 @@ export function PdfReportTemplate({
                       >
                         {att.url.match(/\.(jpeg|jpg|gif|png)$/i) ? (
                           <>
+                            {/* Never cropped: in a report the screenshot is
+                                the evidence, and a crop can remove the very
+                                thing it was taken to show. Sized instead — at
+                                200px a phone capture came out about 105px
+                                wide, readable only if you already knew what it
+                                said. */}
                             <img
                               src={att.url}
                               alt="Evidence"
                               style={{
                                 maxWidth: "100%",
-                                maxHeight: "200px",
+                                maxHeight: "360px",
                                 border: "1px solid #e2e8f0",
                                 borderRadius: "4px",
                                 display: "block",
@@ -1090,7 +1096,7 @@ export function PdfReportTemplate({
                                                     alt="Evidence"
                                                     style={{
                                                       maxWidth: "100%",
-                                                      maxHeight: "200px",
+                                                      maxHeight: "360px",
                                                       border:
                                                         "1px solid #e2e8f0",
                                                       borderRadius: "4px",

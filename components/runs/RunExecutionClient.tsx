@@ -1904,7 +1904,15 @@ export default function RunExecutionClient({
                                     ) : isDocumentUrl(att.url) ? (
                                       <div className="w-full h-full flex flex-col items-center justify-center text-text-faint"><FileText size={24} /><span className="text-[10px] truncate w-full px-1 text-center">{att.name || "File"}</span></div>
                                     ) : (
-                                      <img src={att.url} alt={att.name || "Attachment"} className="w-full h-full object-contain" />
+                                      // Fills the tile rather than fitting
+                                      // inside it. A phone screenshot is about
+                                      // 0.5:1 against a 112x80 tile, so fitting
+                                      // left it 42px wide next to a desktop
+                                      // capture at 111px — the same evidence
+                                      // row looked like some images had failed
+                                      // to upload. Cropped here, whole in the
+                                      // viewer a click away.
+                                      <img src={att.url} alt={att.name || "Attachment"} className="w-full h-full object-cover" />
                                     )}
                                     <button onClick={(e) => { e.stopPropagation(); updateStepResult(step.id, { attachments: attachments.filter((_: any, index: number) => index !== i) }); }} className="absolute top-1 right-1 bg-black/50 text-danger rounded p-0.5 opacity-0 group-hover:opacity-100 transition hover:bg-danger/20 z-10"><XCircle size={14} /></button>
                                   </div>
@@ -1941,7 +1949,8 @@ export default function RunExecutionClient({
                           ) : isDocumentUrl(att.url) ? (
                             <div className="flex flex-col items-center gap-1 text-text-faint"><FileText size={24} /><span className="font-mono text-[10px] truncate w-full px-1 text-center">{att.name}</span></div>
                           ) : (
-                            <img src={att.url} alt={att.name || "Evidence"} className="w-full h-full object-contain" />
+                            // Same tile treatment as the per-step thumbnails.
+                            <img src={att.url} alt={att.name || "Evidence"} className="w-full h-full object-cover" />
                           )}
                         </div>
                       ))}
