@@ -1895,10 +1895,14 @@ export default function RunExecutionClient({
                               placeholder="Actual result / notes…"
                               className="w-full text-[12px] bg-surface-hover text-text-main border border-border rounded-md p-2 min-h-[32px] focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition placeholder:text-text-faint"
                             />
+                            {/* Same grid as the Evidence panel below, so a
+                                screenshot is the same size wherever it is
+                                shown. At 112x80 these were too small to tell
+                                apart without opening each one. */}
                             {attachments.length > 0 && (
-                              <div className="flex flex-wrap gap-2">
+                              <div className="grid grid-cols-2 gap-2">
                                 {attachments.map((att: any, i: number) => (
-                                  <div key={i} className="relative w-28 h-20 border border-border rounded-md overflow-hidden group bg-surface-hover flex items-center justify-center cursor-pointer hover:border-primary transition-colors" onClick={() => setViewingAttachment({ url: att.url, name: att.name || "Attachment" })}>
+                                  <div key={i} className="relative aspect-[16/10] border border-border rounded-[9px] overflow-hidden group bg-surface-hover flex items-center justify-center cursor-pointer hover:border-primary transition-colors" onClick={() => setViewingAttachment({ url: att.url, name: att.name || "Attachment" })}>
                                     {isVideoUrl(att.url) ? (
                                       <video src={att.url} className="w-full h-full object-contain bg-black" />
                                     ) : isDocumentUrl(att.url) ? (
