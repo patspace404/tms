@@ -155,7 +155,10 @@ export default function PublicReportPage({
             src={lightboxSrc}
             alt="Evidence (enlarged)"
             onClick={(e) => e.stopPropagation()}
-            className="max-h-[90vh] max-w-[90vw] rounded-lg shadow-[var(--shadow-dialog)] object-contain"
+            // Sized box, not max-* alone: an img shrinks to fit but never
+            // grows, so a screenshot smaller than the window opened at its own
+            // size and clicking to enlarge it did nothing visible.
+            className="h-[90vh] w-[90vw] rounded-lg shadow-[var(--shadow-dialog)] object-contain"
           />
         </div>
       )}

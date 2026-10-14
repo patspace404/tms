@@ -2258,7 +2258,13 @@ export default function RunExecutionClient({
                   <a href={viewingAttachment.url} download target="_blank" rel="noreferrer" className="px-6 py-2.5 bg-primary text-primary-foreground font-medium rounded-md hover:bg-primary-hover transition-colors shadow-sm">Download File</a>
                 </div>
               ) : (
-                <img src={viewingAttachment.url} alt={viewingAttachment.name} className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" />
+                /* `object-contain` on a sized box, not `max-w-full`. A bare
+                   img only ever shrinks to fit — it will not grow — so a
+                   screenshot smaller than the window opened at its own size,
+                   which could be narrower than the thumbnail that had been
+                   cropped to fill its tile. Clicking to enlarge made it
+                   smaller. This scales it both ways, aspect kept. */
+                <img src={viewingAttachment.url} alt={viewingAttachment.name} className="w-full h-full object-contain rounded-lg shadow-2xl" />
               )}
             </div>
           </div>
