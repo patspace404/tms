@@ -82,8 +82,7 @@ export function ImportCasesModal({
               <span>
                 The file is JSON shaped <code>{"{ suites: [...] }"}</code> — the same
                 thing <strong>Export JSON</strong> produces, so a file exported from one
-                project imports into another. Exports taken out of Qase still work
-                unchanged.
+                project imports into another.
               </span>
             </div>
           </div>

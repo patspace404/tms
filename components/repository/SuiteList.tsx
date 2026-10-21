@@ -235,7 +235,7 @@ export function SuiteList({
   const someOnPageSelected =
     !allOnPageSelected && pagedCases.some((c: any) => selectedCases.has(c.id));
 
-  // Qase-style dense table: check · priority · type · ID · TITLE · TAGS · TYPE · OWNER
+  // Dense table: check · priority · type · ID · TITLE · TAGS · TYPE · OWNER
   const GRID =
     "30px 24px 24px 84px minmax(0,1fr) 150px 112px 56px";
 

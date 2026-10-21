@@ -52,7 +52,7 @@ export async function POST(
       method: "PUT",
       headers,
       body: JSON.stringify({
-        commit_title: `Merge PR #${prNumber} from Qase Clone`,
+        commit_title: `Merge PR #${prNumber} from QMaster`,
         merge_method: "merge", // or "squash", "rebase"
       }),
     });

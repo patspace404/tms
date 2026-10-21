@@ -198,7 +198,7 @@ export async function POST(
         headers,
         body: JSON.stringify({
           title: `[Auto] Bulk Sync Automated Tests`,
-          body: `This PR contains automated Playwright test scripts for ${testCases.length} test cases exported from Qase Clone.\n\n*Updated via automated sync.*`,
+          body: `This PR contains automated Playwright test scripts for ${testCases.length} test cases exported from QMaster.\n\n*Updated via automated sync.*`,
           head: branchName,
           base: "main",
         }),

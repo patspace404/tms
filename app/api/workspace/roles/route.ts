@@ -49,11 +49,6 @@ export async function GET() {
       });
       if (!existing) {
         await prisma.workspaceRole.create({ data: { ...def, isSystem: true } });
-      } else if (existing.description?.toLowerCase().includes("qase")) {
-        await prisma.workspaceRole.update({
-          where: { id: existing.id },
-          data: { description: def.description },
-        });
       }
     }
 

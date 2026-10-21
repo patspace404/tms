@@ -105,11 +105,11 @@ export async function GET(
       status: 200,
       headers: {
         "Content-Type": "application/json",
-        "Content-Disposition": `attachment; filename="${project.code}_qase_export.json"`,
+        "Content-Disposition": `attachment; filename="${project.code}_testcases.json"`,
       },
     });
   } catch (error) {
-    console.error("Failed to export qase:", error);
+    console.error("Failed to export test cases:", error);
     return NextResponse.json({ error: "Export failed" }, { status: 500 });
   }
 }

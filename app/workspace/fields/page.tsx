@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import FieldsClient from "./FieldsClient";
 
 export const metadata = {
-  title: "Fields - Workspace Settings | Qase Clone",
+  title: "Fields - Workspace Settings | QMaster",
 };
 
 export default async function FieldsPage() {

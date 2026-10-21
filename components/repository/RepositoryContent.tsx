@@ -289,7 +289,7 @@ export function RepositoryContent({
     }
   };
 
-  const handleExportQase = () => {
+  const handleExportJson = () => {
     window.open(`/api/projects/${projectCode}/export`, "_blank");
   };
 
@@ -488,7 +488,7 @@ export function RepositoryContent({
                   <Sparkles size={14} className="mr-2 text-text-muted" /> AI Gen
                 </button>
                 <button
-                  onClick={handleExportQase}
+                  onClick={handleExportJson}
                   className="flex items-center w-full px-3 py-2 text-[13px] text-text-main hover:bg-surface-hover rounded-lg text-left border-t border-border mt-1 pt-2"
                 >
                   <Download size={14} className="mr-2 text-text-muted" /> Export JSON

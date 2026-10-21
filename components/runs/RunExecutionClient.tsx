@@ -137,7 +137,7 @@ interface RunExecutionClientProps {
   runId: string;
 }
 
-// Shared column template for the case table (mirrors Qase's dense run table):
+// Shared column template for the case table:
 // status · priority · type · ID · MEMBER · STATUS · TITLE · DURATION · menu
 const ROW_GRID =
   "24px 20px 20px 78px 176px 116px minmax(0,1fr) 132px 92px 30px";
@@ -359,7 +359,7 @@ function ResultRow({
   );
 }
 
-// Column header strip shown above a suite's cases (like Qase's run table).
+// Column header strip shown above a suite's cases.
 function CaseTableHeader({ depth }: { depth: number }) {
   return (
     <div

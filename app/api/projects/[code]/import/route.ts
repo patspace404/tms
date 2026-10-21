@@ -51,7 +51,7 @@ export async function POST(
 
     if (!body || !Array.isArray(body.suites)) {
       return NextResponse.json(
-        { error: "Invalid Qase JSON format. Expected { suites: [...] }" },
+        { error: "Unrecognised file. Expected JSON shaped { suites: [...] }." },
         { status: 400 },
       );
     }
@@ -157,7 +157,7 @@ export async function POST(
 
     return NextResponse.json({ success: true, cases: imported, suites: suitesMade });
   } catch (error: any) {
-    console.error("Failed to import qase:", error);
+    console.error("Failed to import test cases:", error);
     return NextResponse.json(
       { error: error.message || "Import failed" },
       { status: 500 },

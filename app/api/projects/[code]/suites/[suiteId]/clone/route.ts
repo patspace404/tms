@@ -65,7 +65,7 @@ export async function POST(
       if (!sourceSuite) throw new Error(`Suite ${sourceSuiteId} not found`);
 
       const baseTitle = sourceSuite.title;
-      // Qase uses the prefix or just copies it. We will just copy it.
+      // The copy keeps the original title.
 
       // Create new suite
       const newSuite = await prisma.testSuite.create({
