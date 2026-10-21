@@ -61,8 +61,9 @@ export async function POST(
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // This route had no authorisation of any kind: anyone who could reach it
-    // could create suites and cases in any project.
+    // middleware.ts already requires a session on /api/projects/*, but this
+    // route checked nothing beyond that: any signed-in account could import
+    // suites and cases into any project, including one it holds no role on.
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

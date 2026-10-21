@@ -83,8 +83,8 @@ describe("POST /api/projects/[code]/import", () => {
   });
 
   it("refuses an anonymous caller", async () => {
-    // The route had no authorisation at all: anyone reaching it could write
-    // suites and cases into any project.
+    // The middleware requires a session; this is the route's own check, which
+    // did not exist. The role test below is the one that actually mattered.
     sessionMock.mockResolvedValue(null);
 
     const res = await POST(req(twoCases), params());
