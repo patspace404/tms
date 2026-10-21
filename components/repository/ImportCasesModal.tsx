@@ -17,7 +17,7 @@ export function ImportCasesModal({
   suites,
   onSuccess,
 }: ImportCasesModalProps) {
-  const [sourceType, setSourceType] = useState("Qase.io");
+  const [sourceType, setSourceType] = useState("json");
   const [parentId, setParentId] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [replaceMatching, setReplaceMatching] = useState(false);
@@ -38,7 +38,7 @@ export function ImportCasesModal({
       const text = await file.text();
       const payload = JSON.parse(text);
 
-      const res = await fetch(`/api/projects/${projectCode}/import-qase`, {
+      const res = await fetch(`/api/projects/${projectCode}/import`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -77,19 +77,16 @@ export function ImportCasesModal({
 
         <div className="p-6 space-y-5">
           <div className="bg-primary-light border border-primary/20 text-primary text-sm p-4 rounded-lg">
-            If you're using MS Excel for managing your test cases, select the
-            Qase.io as a source type.
+            <div className="flex items-start">
+              <HelpCircle size={15} className="mr-2 mt-[1px] shrink-0" />
+              <span>
+                The file is JSON shaped <code>{"{ suites: [...] }"}</code> — the same
+                thing <strong>Export JSON</strong> produces, so a file exported from one
+                project imports into another. Exports taken out of Qase still work
+                unchanged.
+              </span>
+            </div>
           </div>
-
-          <a
-            href="https://help.qase.io/en/articles/5563701-import-test-cases-from-a-file"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center text-sm text-primary hover:underline"
-          >
-            <HelpCircle size={14} className="mr-1.5" />
-            How to prepare your file for the Qase JSON format
-          </a>
 
           {error && <div className="text-red-600 text-sm">{error}</div>}
 
@@ -102,7 +99,7 @@ export function ImportCasesModal({
               onChange={(e) => setSourceType(e.target.value)}
               className="w-full px-3 py-2 bg-surface border border-text-muted rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
             >
-              <option value="Qase.io">Qase.io (JSON)</option>
+              <option value="json">JSON</option>
             </select>
             <p className="text-xs text-text-muted mt-1">
               Supported formats: JSON

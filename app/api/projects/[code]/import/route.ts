@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+import { requireProjectRole } from "@/lib/project-auth";
+import { allocateSequenceNumber } from "@/lib/case-sequence";
+import { logAudit } from "@/lib/audit-logger";
 
 const parseSeverity = (sev: string | undefined) => {
   if (!sev) return "NORMAL";
@@ -56,6 +61,24 @@ export async function POST(
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
+    // This route had no authorisation of any kind: anyone who could reach it
+    // could create suites and cases in any project.
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = (session.user as any).id;
+    const allowed = await requireProjectRole(project.code, userId, ["EDITOR", "ADMIN"]);
+    if (!allowed && (session.user as any).role !== "ADMIN") {
+      return NextResponse.json(
+        { error: "Forbidden: you cannot import test cases into this project" },
+        { status: 403 },
+      );
+    }
+
+    let imported = 0;
+    let suitesMade = 0;
+
     await prisma.$transaction(
       async (tx) => {
         const processSuites = async (
@@ -74,11 +97,18 @@ export async function POST(
               },
             });
             newSuiteId = newSuite.id;
+            suitesMade++;
 
             if (suite.cases && Array.isArray(suite.cases)) {
               for (const tc of suite.cases) {
+                const sequenceNumber = await allocateSequenceNumber(
+                  tx as any,
+                  project.id,
+                );
+                imported++;
                 await tx.testCase.create({
                   data: {
+                    sequenceNumber,
                     title: tc.title,
                     description: tc.description || null,
                     preconditions: tc.preconditions || null,
@@ -116,7 +146,15 @@ export async function POST(
       },
     );
 
-    return NextResponse.json({ success: true });
+    await logAudit({
+      projectId: project.id,
+      userId,
+      action: "CREATED",
+      entity: "TEST_CASE",
+      details: `Imported ${imported} test case(s) in ${suitesMade} suite(s) from a JSON file`,
+    });
+
+    return NextResponse.json({ success: true, cases: imported, suites: suitesMade });
   } catch (error: any) {
     console.error("Failed to import qase:", error);
     return NextResponse.json(

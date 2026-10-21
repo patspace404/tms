@@ -290,7 +290,7 @@ export function RepositoryContent({
   };
 
   const handleExportQase = () => {
-    window.open(`/api/projects/${projectCode}/export-qase`, "_blank");
+    window.open(`/api/projects/${projectCode}/export`, "_blank");
   };
 
   const handleExportCsv = () => {
@@ -491,7 +491,7 @@ export function RepositoryContent({
                   onClick={handleExportQase}
                   className="flex items-center w-full px-3 py-2 text-[13px] text-text-main hover:bg-surface-hover rounded-lg text-left border-t border-border mt-1 pt-2"
                 >
-                  <Download size={14} className="mr-2 text-text-muted" /> Export Qase
+                  <Download size={14} className="mr-2 text-text-muted" /> Export JSON
                 </button>
                 <button
                   onClick={handleExportCsv}
@@ -503,7 +503,7 @@ export function RepositoryContent({
                   onClick={() => setIsImportModalOpen(true)}
                   className="flex items-center w-full px-3 py-2 text-[13px] text-text-main hover:bg-surface-hover rounded-lg text-left border-t border-border mt-1 pt-2"
                 >
-                  <Upload size={14} className="mr-2 text-text-muted" /> Import Qase
+                  <Upload size={14} className="mr-2 text-text-muted" /> Import JSON
                 </button>
               </div>
             </div>
