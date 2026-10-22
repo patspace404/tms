@@ -9,7 +9,7 @@ import { ChevronDown, Search, User, LogOut, KeyRound } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CommandPalette } from "@/components/ui/CommandPalette";
 import { initialsOf } from "@/lib/initials";
-import { BrandMark, BrandTile } from "@/components/ui/BrandMark";
+import { BrandTile } from "@/components/ui/BrandMark";
 
 const NAV_LINKS = [
   { name: "Projects", href: "/projects" },
@@ -58,12 +58,12 @@ export function TopNav() {
         {/* Left: Logo */}
         <Link href="/projects" className="group flex items-center gap-[9px]">
           {logoUrl ? (
-            <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center overflow-hidden rounded-[7px] bg-primary text-primary-fg">
+            <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center overflow-hidden rounded-[8px] bg-primary text-primary-fg">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={logoUrl} alt="Workspace logo" className="h-full w-full object-cover" />
             </span>
           ) : (
-            <BrandTile size={26} />
+            <BrandTile size={30} />
           )}
           <span className="text-[15px] font-bold tracking-[-0.01em] text-text-main">
             QMaster

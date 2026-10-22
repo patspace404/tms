@@ -4,9 +4,10 @@ import { cn } from "@/lib/utils";
  * The Socket9 mark, as vectors rather than the raster logo in /public.
  *
  * Drawn from the artwork's own geometry so it stays crisp at the 24–30px the
- * app actually uses it at, where a JPEG shows its edges. The counter inside the
- * glyph is knocked out rather than filled white, so the mark sits on whatever
- * surface it is placed on.
+ * app actually uses it at, where a JPEG shows its edges. The box is cropped
+ * closer than the source file's generous margin, so a given size buys glyph
+ * rather than air. The counter is knocked out rather than filled white, so the
+ * mark sits on whatever surface it is placed on.
  */
 const NAVY = "#20356E";
 const BLUE = "#2D65B2";
@@ -27,7 +28,7 @@ export function BrandMark({ size = 20, className }: { size?: number; className?:
     <svg
       width={size}
       height={size}
-      viewBox="45 33 320 320"
+      viewBox="60 48 290 290"
       className={className}
       role="img"
       aria-label="Socket9"
@@ -48,10 +49,12 @@ export function BrandTile({ size = 26, className }: { size?: number; className?:
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-[7px] bg-white ring-1 ring-black/[0.06] dark:ring-white/10",
+        "inline-flex shrink-0 items-center justify-center bg-white ring-1 ring-black/[0.06] dark:ring-white/10",
         className,
       )}
-      style={{ width: size, height: size }}
+      // The corner follows the box rather than a fixed radius, so the tile keeps
+      // the same silhouette at every size it is used at.
+      style={{ width: size, height: size, borderRadius: Math.round(size * 0.27) }}
     >
       <BrandMark size={Math.round(size * 0.82)} />
     </span>

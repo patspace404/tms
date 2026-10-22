@@ -51,7 +51,7 @@ export function AuthShell({
         </svg>
 
         <div className="relative flex items-center gap-[10px]">
-          <BrandTile size={30} className="rounded-[8px]" />
+          <BrandTile size={30} />
           <span className="text-[17px] font-bold tracking-[-0.01em]">QMaster</span>
         </div>
 
@@ -71,7 +71,7 @@ export function AuthShell({
       <section className="flex min-h-screen items-center justify-center bg-surface p-[40px] max-sm:px-6">
         <div className="flex w-full max-w-[340px] flex-col gap-[18px]">
           <div className="flex items-center gap-[10px] lg:hidden">
-            <BrandTile size={30} className="rounded-[8px]" />
+            <BrandTile size={30} />
             <span className="text-[17px] font-bold tracking-[-0.01em] text-text-main">
               QMaster
             </span>
