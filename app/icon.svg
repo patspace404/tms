@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="60 48 290 290">
+<svg xmlns="http://www.w3.org/2000/svg" width="290" height="290" viewBox="60 48 290 290">
   <rect x="60" y="48" width="290" height="290" rx="64" fill="#fff"/>
   <path fill="#20356E" fill-rule="evenodd" d="M123 119 H228 V157 H266 V287 A36 36 0 0 1 230 323 H92 V286 H227 V240 H123 A36 36 0 0 1 87 204 V155 A36 36 0 0 1 123 119 Z M130 157 H224 A4 4 0 0 1 228 161 V198 A4 4 0 0 1 224 202 H130 A4 4 0 0 1 126 198 V161 A4 4 0 0 1 130 157 Z"/>
   <path fill="#2D65B2" d="M228 62 H247 V81 H228 Z M266 62 H323 V156 H304 V81 H266 Z M228 100 H285 V156 H266 V119 H228 Z"/>
