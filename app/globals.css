@@ -462,3 +462,70 @@ button:disabled {
     max-width: none !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Test runs table.
+
+   The column template lives here rather than in an inline style, because an
+   inline style wins over every breakpoint and left the narrow layout unable to
+   override it: the run name collapsed to nothing and the badge sat on top of
+   the progress bar.
+--------------------------------------------------------------------------- */
+.runs-grid {
+  display: grid;
+  gap: 16px;
+  align-items: center;
+  grid-template-columns: 104px minmax(0, 1fr) 168px 58px 132px 84px 32px;
+}
+
+@media (max-width: 900px) {
+  .runs-head {
+    display: none;
+  }
+
+  /* Three lines: the name leads, then state and progress, then who and when. */
+  .runs-grid {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name rate"
+      "status progress"
+      "owner updated";
+    row-gap: 8px;
+    column-gap: 12px;
+    height: auto;
+    padding-top: 13px;
+    padding-bottom: 13px;
+  }
+
+  .runs-grid > .runs-name { grid-area: name; }
+  .runs-grid > .runs-rate { grid-area: rate; justify-self: end; }
+  .runs-grid > .runs-status { grid-area: status; }
+  .runs-grid > .runs-progress { grid-area: progress; min-width: 120px; }
+  .runs-grid > .runs-owner { grid-area: owner; }
+  .runs-grid > .runs-updated { grid-area: updated; justify-self: end; }
+  /* The row itself opens the run on tap; the menu is reachable from inside it. */
+  .runs-grid > .runs-menu { position: absolute; top: 10px; right: 10px; }
+}
+
+/* The flag sits after the run name where there is room for both. On a narrow
+   screen the title gets the whole line and the flag rides with the status. */
+.runs-status > .runs-flag {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .runs-name > .runs-flag {
+    display: none;
+  }
+  .runs-status > .runs-flag {
+    display: inline-block;
+    margin-left: 8px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--success);
+    border: 1px solid color-mix(in oklch, var(--success) 30%, transparent);
+    padding: 1px 6px;
+    border-radius: 5px;
+    white-space: nowrap;
+  }
+}

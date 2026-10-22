@@ -43,3 +43,30 @@ export function displayNameOf(
 ): string {
   return (name || "").trim() || (fallbackEmail || "").split("@")[0] || "Unknown";
 }
+
+/**
+ * A short name for a narrow column.
+ *
+ * Full names from Microsoft SSO run long — "Sirikorn Na Lamphun (Nim)" — and a
+ * table cell truncates them to "Sirikorn Na Lam…", which identifies nobody. The
+ * bracketed nickname is what this team actually calls each other, so it wins
+ * when there is one; otherwise the first word.
+ *
+ * `displayNameOf` is unchanged: screens with room for the full name still show
+ * it.
+ */
+export function shortNameOf(
+  name?: string | null,
+  fallbackEmail?: string | null,
+): string {
+  const source = (name || "").trim();
+  if (source) {
+    const nickname = source.match(/[([]([^)\]]+)[)\]]\s*$/);
+    if (nickname?.[1]?.trim()) return nickname[1].trim();
+    const first = source.split(/\s+/).filter(Boolean)[0];
+    if (first) return first;
+  }
+  const local = (fallbackEmail || "").split("@")[0];
+  // Nobody is assigned, which is not the same as failing to identify someone.
+  return local || "Unassigned";
+}

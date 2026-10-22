@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { displayNameOf, initialsOf } from "@/lib/initials";
+import { displayNameOf, initialsOf, shortNameOf } from "@/lib/initials";
 
 describe("initialsOf", () => {
   // Every one of these names is really in the workspace; five of the ten carry
@@ -50,5 +50,32 @@ describe("displayNameOf", () => {
     expect(displayNameOf("Nim", "x@y.com")).toBe("Nim");
     expect(displayNameOf(null, "penradee.k@socket9.com")).toBe("penradee.k");
     expect(displayNameOf(null, null)).toBe("Unknown");
+  });
+});
+
+describe("shortNameOf", () => {
+  it("prefers the nickname the team actually uses", () => {
+    expect(shortNameOf("Sirikorn Na Lamphun (Nim)")).toBe("Nim");
+    expect(shortNameOf("Supat   Torsakun (Nui)")).toBe("Nui");
+    expect(shortNameOf("Budsara  Sirisa [Snack]")).toBe("Snack");
+  });
+
+  it("falls back to the first word when there is no nickname", () => {
+    expect(shortNameOf("Penradee Klangsoontornrangsi")).toBe("Penradee");
+  });
+
+  it("uses the email's local part when there is no name", () => {
+    expect(shortNameOf(null, "wirach.s@socket9.com")).toBe("wirach.s");
+    expect(shortNameOf("   ", "oa@socket9.com")).toBe("oa");
+  });
+
+  it("says Unassigned rather than Unknown when nobody owns it", () => {
+    // A run with no author is unassigned; nothing failed to identify a person.
+    expect(shortNameOf(null, null)).toBe("Unassigned");
+    expect(shortNameOf(undefined, undefined)).toBe("Unassigned");
+  });
+
+  it("survives a name that is only a nickname", () => {
+    expect(shortNameOf("(Oh)")).toBe("Oh");
   });
 });
