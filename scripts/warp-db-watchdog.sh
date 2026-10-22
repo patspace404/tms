@@ -6,20 +6,19 @@
 # split tunnel has 10.0.1.36/32 on its include list, so the route is
 # `10.0.1.36 dev CloudflareWARP table 65743`.
 #
-# Every day at 04:00 UTC the daemon replaces its registration (it authenticates
-# with a service token). After that it keeps reporting `Connected / healthy`,
-# but the include route for the database is gone — traffic falls back to the
-# VPC path on ens5 and WARP's own firewall rule, `ip saddr 10.0.1.36 drop`,
-# throws the replies away. Connections then hang rather than fail, so the site
-# serves its HTML and every data request times out. Twice this has been noticed
-# by a person, hours later.
+# The failure this guards against: warp-svc keeps reporting `Connected /
+# healthy` while the tunnel is unusable — its DoH resolver timing out is one
+# way in. Traffic for the database then falls back to the VPC path on ens5 and
+# meets WARP's own firewall rule, `ip saddr 10.0.1.36 drop`, which throws the
+# replies away. Connections hang rather than fail, so the site serves its HTML
+# and every data request times out. Twice this was noticed by a person, hours
+# later.
 #
 # Reconnecting rebuilds the route. This checks for the fault and does that, so
 # the gap is a minute instead of a morning.
 #
-# The real fix belongs in the Cloudflare Zero Trust dashboard — the daily
-# re-registration should not drop the include route — and is not something the
-# box can decide. Until then, this is the net.
+# The daily restart in /etc/cron.d/warp-restart predates this script and is the
+# blunt version of the same idea. It is belt and braces now, not the mechanism.
 #
 # Installed by scripts/install-warp-db-watchdog.sh as a systemd timer, run as
 # root once a minute.
