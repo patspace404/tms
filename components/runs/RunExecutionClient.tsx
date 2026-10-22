@@ -43,7 +43,7 @@ import { ReportBugModal } from "./ReportBugModal";
 import { toast } from "sonner";
 import { MAX_UPLOAD_BYTES, tooLargeMessage } from "@/lib/upload-limits";
 import { isDocumentUrl, isVideoUrl } from "@/lib/attachment-kind";
-import { isRunOpen } from "@/lib/run-open";
+import { isRunOpen } from "@/lib/run-open-status";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { createPortal } from "react-dom";
