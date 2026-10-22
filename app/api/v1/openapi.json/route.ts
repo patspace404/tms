@@ -18,11 +18,11 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
 
-  // nginx forwards Host but not X-Forwarded-Proto, and `req.url` is always
-  // http here because the proxy terminates TLS. Trust the header when it is
-  // there; otherwise anything that is not a local address is being served over
-  // https, and handing out an http:// server url would send readers somewhere
-  // that only redirects.
+  // `req.url` is always http here because nginx terminates TLS, so the scheme
+  // comes from X-Forwarded-Proto, which nginx now sets. The fallback stands in
+  // case this runs behind a proxy that does not: anything that is not a local
+  // address is served over https, and an http:// server url would send readers
+  // somewhere that only redirects.
   const isLocal = /^(localhost|127\.0\.0\.1|\[::1\])(:|$)/.test(host);
   const proto = req.headers.get("x-forwarded-proto") || (isLocal ? "http" : "https");
 
