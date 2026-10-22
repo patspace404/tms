@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { CheckCircle2, AlertCircle } from "lucide-react";
+import { BrandMark } from "@/components/ui/BrandMark";
 import {
   AuthBanner,
   AuthCenteredShell,
@@ -56,18 +57,10 @@ function LoginPageContent() {
 
   return (
     <AuthCenteredShell>
-      {/* The artwork has a white ground, so it sits in a white tile: deliberate
-          in either theme, and it never punches a hole through the counter of
-          the mark the way keying out the white would. */}
+      {/* The mark is two shades of navy, so it sits in a white tile rather
+          than on the surface: deliberate in either theme. */}
       <div className="flex h-[72px] w-[72px] items-center justify-center rounded-[20px] bg-white shadow-[var(--shadow-float)] ring-1 ring-black/[0.06] dark:ring-white/10">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/socketnine-logo.jpg"
-          alt="Socket Nine"
-          width={56}
-          height={56}
-          className="h-[56px] w-[56px] object-contain"
-        />
+        <BrandMark size={56} />
       </div>
 
       <h1 className="mt-[26px] text-balance text-[25px] font-semibold leading-[1.2] tracking-[-0.02em] text-text-main">

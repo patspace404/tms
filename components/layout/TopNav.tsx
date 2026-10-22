@@ -5,10 +5,11 @@ import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronDown, Search, User, LogOut, Radar, KeyRound } from "lucide-react";
+import { ChevronDown, Search, User, LogOut, KeyRound } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CommandPalette } from "@/components/ui/CommandPalette";
 import { initialsOf } from "@/lib/initials";
+import { BrandMark, BrandTile } from "@/components/ui/BrandMark";
 
 const NAV_LINKS = [
   { name: "Projects", href: "/projects" },
@@ -56,14 +57,14 @@ export function TopNav() {
       <div className="flex h-[52px] items-center gap-5 px-[18px]">
         {/* Left: Logo */}
         <Link href="/projects" className="group flex items-center gap-[9px]">
-          <div className="flex h-[26px] w-[26px] items-center justify-center overflow-hidden rounded-[7px] bg-primary text-primary-fg">
-            {logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
+          {logoUrl ? (
+            <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center overflow-hidden rounded-[7px] bg-primary text-primary-fg">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={logoUrl} alt="Workspace logo" className="h-full w-full object-cover" />
-            ) : (
-              <Radar size={18} />
-            )}
-          </div>
+            </span>
+          ) : (
+            <BrandTile size={26} />
+          )}
           <span className="text-[15px] font-bold tracking-[-0.01em] text-text-main">
             QMaster
           </span>

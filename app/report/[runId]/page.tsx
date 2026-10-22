@@ -3,7 +3,8 @@
 import React, { use, useState } from "react";
 import useSWR from "swr";
 import { PdfReportTemplate } from "@/components/runs/PdfReportTemplate";
-import { Loader2, X, Radar, Globe, Download, AlertTriangle } from "lucide-react";
+import { Loader2, X, Globe, Download, AlertTriangle } from "lucide-react";
+import { BrandTile } from "@/components/ui/BrandMark";
 
 const fetcher = (url: string) =>
   fetch(url).then((res) => {
@@ -80,9 +81,7 @@ export default function PublicReportPage({
     <div className="min-h-screen bg-background transition-colors">
       {/* public top bar */}
       <div className="qm-no-print flex items-center gap-[10px] px-[22px] py-[13px] bg-surface border-b border-border">
-        <div className="w-[24px] h-[24px] rounded-[7px] bg-primary flex items-center justify-center shrink-0">
-          <Radar size={16} className="text-primary-foreground" />
-        </div>
+        <BrandTile size={24} />
         <span className="font-bold text-[14px] text-text-main">QMaster</span>
         <span className="inline-flex items-center gap-[4px] text-[11px] font-semibold px-[9px] py-[2px] rounded-full bg-surface-2 text-text-muted ml-[4px]">
           <Globe size={13} />
