@@ -13,7 +13,18 @@ vi.mock("@/lib/prisma", () => ({
     workspaceSetting: {
       findMany: vi.fn(),
     },
+    testRun: {
+      findFirst: vi.fn(async () => ({ id: "run-1", status: "ACTIVE" })),
+    },
   },
+}));
+
+// Executing a script writes a result, so the route checks the run is still
+// open first. Refusal on a closed run is covered in tests/unit/run-open.test.ts.
+vi.mock("@/lib/run-open", () => ({
+  requireOpenRun: vi.fn(async () => ({ ok: true, run: { id: "run-1", status: "ACTIVE" } })),
+  isRunOpen: () => true,
+  RUN_CLOSED_MESSAGE: "closed",
 }));
 
 vi.mock("fs", () => ({

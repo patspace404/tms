@@ -9,6 +9,14 @@ vi.mock("@/lib/prisma", () => ({
   prisma: { testRunResult: runResultMock },
 }));
 
+// The closed-run guard has its own tests; here it only needs to let the
+// script through.
+vi.mock("@/lib/run-open", () => ({
+  requireOpenRun: vi.fn(async () => ({ ok: true, run: { id: "run1", status: "ACTIVE" } })),
+  isRunOpen: () => true,
+  RUN_CLOSED_MESSAGE: "closed",
+}));
+
 // Mock fs and child_process to avoid actual file writes and shell execution
 vi.mock("fs", () => ({
   default: {

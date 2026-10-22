@@ -8,6 +8,7 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     testRun: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
     },
     testRunResult: {
       findUnique: vi.fn(),
@@ -28,6 +29,8 @@ vi.mock("@/lib/api-auth", () => ({
 
 const mockedGetSessionUser = vi.mocked(getSessionUser);
 const testRunFindUnique = prisma.testRun.findUnique as unknown as Mock;
+// requireOpenRun reads the run to check it is still ACTIVE.
+const testRunFindFirst = prisma.testRun.findFirst as unknown as Mock;
 const resultFindUnique = prisma.testRunResult.findUnique as unknown as Mock;
 const resultUpdate = prisma.testRunResult.update as unknown as Mock;
 const resultDelete = prisma.testRunResult.delete as unknown as Mock;
@@ -50,7 +53,8 @@ describe("run result API routes", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mockedGetSessionUser.mockResolvedValue({ id: "actor-1", role: "USER", workspaceRole: null });
-    testRunFindUnique.mockResolvedValue({ id: "run-1" });
+    testRunFindUnique.mockResolvedValue({ id: "run-1", status: "ACTIVE" });
+    testRunFindFirst.mockResolvedValue({ id: "run-1", status: "ACTIVE" });
     resultFindUnique.mockResolvedValue({
       assigneeId: null,
       testCase: { title: "Checkout works" },

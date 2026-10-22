@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
   XCircle,
+  Lock,
   RefreshCw,
   RotateCcw,
   ArrowLeft,
@@ -42,6 +43,7 @@ import { ReportBugModal } from "./ReportBugModal";
 import { toast } from "sonner";
 import { MAX_UPLOAD_BYTES, tooLargeMessage } from "@/lib/upload-limits";
 import { isDocumentUrl, isVideoUrl } from "@/lib/attachment-kind";
+import { isRunOpen } from "@/lib/run-open";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { createPortal } from "react-dom";
@@ -1011,6 +1013,10 @@ export default function RunExecutionClient({
     }
   };
 
+  // One source of truth for "can results still be changed", matching the
+  // server's rule so the screen never offers an edit that will be refused.
+  const runOpen = isRunOpen(run?.status);
+
   const updateResult = async (resultId: string, status: string) => {
     try {
       // Optimistic update — stamp the executor locally too so the "who / when"
@@ -1870,8 +1876,9 @@ export default function RunExecutionClient({
                           <div className="text-[13px] text-text-muted whitespace-pre-wrap">{step.expectedResult}</div>
                           <div className="text-right">
                             <button
-                              onClick={() => updateStepResult(step.id, { status: next || null, derivedFrom: null })}
-                              title={stepTitle}
+                              onClick={() => { if (runOpen) updateStepResult(step.id, { status: next || null, derivedFrom: null }); }}
+                              disabled={!runOpen}
+                              title={runOpen ? stepTitle : "This run is closed."}
                               className="inline-flex items-center gap-[4px] text-[10.5px] font-bold px-[8px] py-[2px] rounded-full hover:opacity-80 transition-opacity"
                               style={{
                                 background: sv.soft,
@@ -1892,7 +1899,8 @@ export default function RunExecutionClient({
                               onChange={(e) => setStepResults({ ...stepResults, [step.id]: { ...stepData, actualResult: e.target.value } })}
                               onBlur={(e) => updateStepResult(step.id, { actualResult: e.target.value })}
                               onPaste={(e) => handlePaste(e, step.id)}
-                              placeholder="Actual result / notes…"
+                              readOnly={!runOpen}
+                              placeholder={runOpen ? "Actual result / notes…" : ""}
                               className="w-full text-[12px] bg-surface-hover text-text-main border border-border rounded-md p-2 min-h-[32px] focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition placeholder:text-text-faint"
                             />
                             {/* Same grid as the Evidence panel below, so a
@@ -1918,16 +1926,22 @@ export default function RunExecutionClient({
                                       // viewer a click away.
                                       <img src={att.url} alt={att.name || "Attachment"} className="w-full h-full object-cover" />
                                     )}
-                                    <button onClick={(e) => { e.stopPropagation(); updateStepResult(step.id, { attachments: attachments.filter((_: any, index: number) => index !== i) }); }} className="absolute top-1 right-1 bg-black/50 text-danger rounded p-0.5 opacity-0 group-hover:opacity-100 transition hover:bg-danger/20 z-10"><XCircle size={14} /></button>
+                                    {runOpen && (
+                                      <button onClick={(e) => { e.stopPropagation(); updateStepResult(step.id, { attachments: attachments.filter((_: any, index: number) => index !== i) }); }} className="absolute top-1 right-1 bg-black/50 text-danger rounded p-0.5 opacity-0 group-hover:opacity-100 transition hover:bg-danger/20 z-10"><XCircle size={14} /></button>
+                                    )}
                                   </div>
                                 ))}
                               </div>
                             )}
-                            <input type="file" id={`file-upload-${step.id}`} className="hidden" multiple accept="image/*,video/*,.txt,.log,.json,.har,.csv" onChange={(e) => { const files = Array.from(e.target.files || []); if (files.length) { handleFileUpload(step.id, files); } e.target.value = ""; }} />
-                            <label htmlFor={`file-upload-${step.id}`} className="flex items-center justify-center gap-1.5 py-1.5 border border-dashed border-border hover:border-primary bg-surface-hover hover:bg-surface rounded-md text-[11px] font-semibold text-text-faint hover:text-primary cursor-pointer transition w-full">
-                              <ImageIcon size={13} /> <span>Upload screenshot / log</span>
-                              {uploadingStepId === step.id && <RefreshCw size={12} className="animate-spin" />}
-                            </label>
+                            {runOpen && (
+                              <>
+                                <input type="file" id={`file-upload-${step.id}`} className="hidden" multiple accept="image/*,video/*,.txt,.log,.json,.har,.csv" onChange={(e) => { const files = Array.from(e.target.files || []); if (files.length) { handleFileUpload(step.id, files); } e.target.value = ""; }} />
+                                <label htmlFor={`file-upload-${step.id}`} className="flex items-center justify-center gap-1.5 py-1.5 border border-dashed border-border hover:border-primary bg-surface-hover hover:bg-surface rounded-md text-[11px] font-semibold text-text-faint hover:text-primary cursor-pointer transition w-full">
+                                  <ImageIcon size={13} /> <span>Upload screenshot / log</span>
+                                  {uploadingStepId === step.id && <RefreshCw size={12} className="animate-spin" />}
+                                </label>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1986,13 +2000,27 @@ export default function RunExecutionClient({
               </div>{/* end scroll content */}
 
               {/* runner action bar (pinned footer) */}
-              <div className="shrink-0 border-t border-border bg-background px-[24px] py-[14px] flex items-center gap-[9px]">
-                <button onClick={() => updateResult(activeResult.id, "PASSED")} className="flex-1 flex items-center justify-center gap-[7px] h-[44px] rounded-[10px] bg-success text-white font-bold text-[14px] shadow-sm hover:opacity-90 transition-opacity"><CheckCircle2 size={19} />Pass</button>
-                <button onClick={() => updateResult(activeResult.id, "FAILED")} className="flex-1 flex items-center justify-center gap-[7px] h-[44px] rounded-[10px] bg-danger text-white font-bold text-[14px] shadow-sm hover:opacity-90 transition-opacity"><XCircle size={19} />Fail</button>
-                <button onClick={() => updateResult(activeResult.id, "BLOCKED")} className="flex items-center justify-center gap-[7px] h-[44px] px-[18px] rounded-[10px] bg-surface border border-[var(--border-strong)] text-warning font-bold text-[14px] hover:bg-surface-hover transition-colors"><Ban size={19} />Block</button>
-                <button onClick={() => updateResult(activeResult.id, "SKIPPED")} className="flex items-center justify-center gap-[7px] h-[44px] px-[18px] rounded-[10px] bg-surface border border-[var(--border-strong)] text-text-muted font-bold text-[14px] hover:bg-surface-hover transition-colors"><SkipForward size={19} />Skip</button>
-                <button onClick={() => setReportingResult(activeResult)} title="Report bug / AI triage" className="w-[44px] h-[44px] rounded-[10px] bg-surface border border-border flex items-center justify-center text-danger hover:bg-danger-soft transition-colors"><Bug size={20} /></button>
-              </div>
+              {runOpen ? (
+                <div className="shrink-0 border-t border-border bg-background px-[24px] py-[14px] flex items-center gap-[9px]">
+                  <button onClick={() => updateResult(activeResult.id, "PASSED")} className="flex-1 flex items-center justify-center gap-[7px] h-[44px] rounded-[10px] bg-success text-white font-bold text-[14px] shadow-sm hover:opacity-90 transition-opacity"><CheckCircle2 size={19} />Pass</button>
+                  <button onClick={() => updateResult(activeResult.id, "FAILED")} className="flex-1 flex items-center justify-center gap-[7px] h-[44px] rounded-[10px] bg-danger text-white font-bold text-[14px] shadow-sm hover:opacity-90 transition-opacity"><XCircle size={19} />Fail</button>
+                  <button onClick={() => updateResult(activeResult.id, "BLOCKED")} className="flex items-center justify-center gap-[7px] h-[44px] px-[18px] rounded-[10px] bg-surface border border-[var(--border-strong)] text-warning font-bold text-[14px] hover:bg-surface-hover transition-colors"><Ban size={19} />Block</button>
+                  <button onClick={() => updateResult(activeResult.id, "SKIPPED")} className="flex items-center justify-center gap-[7px] h-[44px] px-[18px] rounded-[10px] bg-surface border border-[var(--border-strong)] text-text-muted font-bold text-[14px] hover:bg-surface-hover transition-colors"><SkipForward size={19} />Skip</button>
+                  <button onClick={() => setReportingResult(activeResult)} title="Report bug / AI triage" className="w-[44px] h-[44px] rounded-[10px] bg-surface border border-border flex items-center justify-center text-danger hover:bg-danger-soft transition-colors"><Bug size={20} /></button>
+                </div>
+              ) : (
+                /* The server refuses result changes on a closed run, so the
+                   verdict buttons are not shown rather than offered and then
+                   rejected. Reporting a bug still works: that is about the
+                   software, not the run's numbers. */
+                <div className="shrink-0 border-t border-border bg-background px-[24px] py-[14px] flex items-center gap-[10px]">
+                  <Lock size={16} className="text-text-faint shrink-0" />
+                  <span className="text-[13px] text-text-muted">
+                    This run is {String(run.status).toLowerCase()}. Reopen it to change results.
+                  </span>
+                  <button onClick={() => setReportingResult(activeResult)} title="Report bug / AI triage" className="ml-auto w-[40px] h-[40px] rounded-[10px] bg-surface border border-border flex items-center justify-center text-danger hover:bg-danger-soft transition-colors"><Bug size={18} /></button>
+                </div>
+              )}
             </div>
               );
             })()

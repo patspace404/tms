@@ -8,8 +8,15 @@ const testRunResultMock = vi.hoisted(() => ({
 const notificationMock = vi.hoisted(() => ({ create: vi.fn() }));
 const apiAuthMock = vi.hoisted(() => ({ getSessionUser: vi.fn() }));
 
+const testRunMock = vi.hoisted(() => ({ findFirst: vi.fn() }));
+
 vi.mock("@/lib/prisma", () => ({
-  prisma: { testRunResult: testRunResultMock, notification: notificationMock },
+  prisma: {
+    testRunResult: testRunResultMock,
+    notification: notificationMock,
+    // requireOpenRun reads the run before allowing a result change.
+    testRun: testRunMock,
+  },
 }));
 vi.mock("@/lib/api-auth", () => apiAuthMock);
 
@@ -29,6 +36,7 @@ function patchRequest(body: unknown) {
 
 describe("PATCH /api/runs/[runId]/results/[resultId]", () => {
   beforeEach(() => {
+    testRunMock.findFirst.mockResolvedValue({ id: "run-1", status: "ACTIVE" });
     vi.clearAllMocks();
     apiAuthMock.getSessionUser.mockResolvedValue({ id: "u1", role: "ADMIN" });
     testRunResultMock.findUnique.mockResolvedValue({ assigneeId: null, testCase: { title: "Case A" } });
@@ -109,5 +117,49 @@ describe("DELETE /api/runs/[runId]/results/[resultId]", () => {
     );
 
     expect(res.status).toBe(500);
+  });
+});
+
+describe("a closed run refuses result changes", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    apiAuthMock.getSessionUser.mockResolvedValue({ id: "user-1" });
+  });
+
+  for (const status of ["COMPLETED", "ABORTED"] as const) {
+    it(`refuses a PATCH on a ${status} run`, async () => {
+      testRunMock.findFirst.mockResolvedValue({ id: "run-1", status });
+
+      const res = await PATCH(
+        patchRequest({ status: "PASSED" }),
+        routeParams("run-1", "res-1"),
+      );
+
+      expect(res.status).toBe(409);
+      expect(testRunResultMock.update).not.toHaveBeenCalled();
+    });
+
+    it(`refuses a DELETE on a ${status} run`, async () => {
+      testRunMock.findFirst.mockResolvedValue({ id: "run-1", status });
+
+      const res = await DELETE(
+        new Request("http://localhost/api/runs/run-1/results/res-1", { method: "DELETE" }),
+        routeParams("run-1", "res-1"),
+      );
+
+      expect(res.status).toBe(409);
+      expect(testRunResultMock.delete).not.toHaveBeenCalled();
+    });
+  }
+
+  it("says to reopen the run rather than just refusing", async () => {
+    testRunMock.findFirst.mockResolvedValue({ id: "run-1", status: "COMPLETED" });
+
+    const res = await PATCH(
+      patchRequest({ status: "PASSED" }),
+      routeParams("run-1", "res-1"),
+    );
+
+    expect((await res.json()).error).toMatch(/reopen/i);
   });
 });

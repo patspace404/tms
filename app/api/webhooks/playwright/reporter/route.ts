@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireOpenRun } from "@/lib/run-open";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(req: Request) {
@@ -27,6 +28,13 @@ export async function POST(req: Request) {
       if (testCase) {
         caseId = testCase.id;
       }
+    }
+
+    // A finished run keeps its numbers: a CI job reporting late must not
+    // rewrite results somebody has already read.
+    const open = await requireOpenRun(runId);
+    if (!open.ok) {
+      return NextResponse.json({ error: open.error }, { status: open.status });
     }
 
     // Find the exact result record matching this run and case

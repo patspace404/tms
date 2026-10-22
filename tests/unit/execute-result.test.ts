@@ -5,6 +5,11 @@ const execMock = vi.hoisted(() => vi.fn());
 const fsMock = vi.hoisted(() => ({ writeFileSync: vi.fn(), unlinkSync: vi.fn() }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: { testRunResult: testRunResultMock } }));
+vi.mock("@/lib/run-open", () => ({
+  requireOpenRun: vi.fn(async () => ({ ok: true, run: { id: "run1", status: "ACTIVE" } })),
+  isRunOpen: () => true,
+  RUN_CLOSED_MESSAGE: "closed",
+}));
 vi.mock("child_process", () => ({ exec: vi.fn() }));
 vi.mock("util", () => ({ default: { promisify: () => execMock }, promisify: () => execMock }));
 vi.mock("fs", () => ({ default: fsMock, ...fsMock }));

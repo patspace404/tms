@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireOpenRun } from "@/lib/run-open";
 import { prisma } from "@/lib/prisma";
 import fs from "fs";
 import path from "path";
@@ -16,6 +17,11 @@ export async function POST(
 ) {
   const { code, runId, resultId } = await params;
   try {
+    const open = await requireOpenRun(runId);
+    if (!open.ok) {
+      return NextResponse.json({ error: open.error }, { status: open.status });
+    }
+
     const body = await req.json();
     const { script } = body;
 

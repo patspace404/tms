@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/api-auth";
 import { deriveStepVerdicts } from "@/lib/qase/sync";
+import { requireOpenRun } from "@/lib/run-open";
 
 export async function GET(
   req: Request,
@@ -44,6 +45,11 @@ export async function PATCH(
 ) {
   const { runId, resultId } = await params;
   try {
+    const open = await requireOpenRun(runId);
+    if (!open.ok) {
+      return NextResponse.json({ error: open.error }, { status: open.status });
+    }
+
     const body = await req.json();
     const { status, timeSpent, errorMessage, comment, stepResults } = body;
     let { assigneeId } = body;
@@ -153,6 +159,11 @@ export async function DELETE(
 ) {
   const { runId, resultId } = await params;
   try {
+    const open = await requireOpenRun(runId);
+    if (!open.ok) {
+      return NextResponse.json({ error: open.error }, { status: open.status });
+    }
+
     await prisma.testRunResult.delete({
       where: {
         id: resultId,

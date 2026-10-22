@@ -1,6 +1,7 @@
 // (Phase 2) Backend API Routes
 // # Webhook สำหรับรับผลจาก Automation (Playwright/Cypress)
 import { prisma } from "@/lib/prisma";
+import { isRunOpen, RUN_CLOSED_MESSAGE } from "@/lib/run-open";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionUser } from "@/lib/api-auth";
@@ -32,6 +33,12 @@ export async function POST(
         { error: "Test Run not found" },
         { status: 404 },
       );
+    // A closed run keeps its numbers. This route also takes automation
+    // webhooks, so a late CI job reporting into a finished run is exactly the
+    // case worth refusing rather than quietly rewriting it.
+    if (!isRunOpen(run.status)) {
+      return NextResponse.json({ error: RUN_CLOSED_MESSAGE }, { status: 409 });
+    }
 
     // Record who submitted the batch. This route also serves unauthenticated
     // automation webhooks, so the executor may legitimately be unknown — the
