@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronDown, Search, User, LogOut, KeyRound } from "lucide-react";
+import { ChevronDown, Search, User, LogOut, KeyRound, BookOpen } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CommandPalette } from "@/components/ui/CommandPalette";
 import NotificationDropdown from "@/components/layout/NotificationDropdown";
@@ -17,6 +17,7 @@ const NAV_LINKS = [
   { name: "Workspace", href: "/workspace" },
   { name: "Dashboards", href: "/dashboards" },
   { name: "Monitor", href: "/monitor" },
+  { name: "API Docs", href: "/docs/api" },
 ];
 
 export function TopNav() {
@@ -154,6 +155,13 @@ export function TopNav() {
                   >
                     <KeyRound size={16} />
                     API tokens
+                  </Link>
+                  <Link
+                    href="/docs/api"
+                    className="flex items-center gap-3 rounded-[9px] px-4 py-2.5 text-[14px] font-semibold text-text-muted transition-colors hover:bg-surface-hover hover:text-text-main"
+                  >
+                    <BookOpen size={16} />
+                    API documentation
                   </Link>
                 </div>
                 <div className="mt-1 border-t border-border/50 px-2 py-1">

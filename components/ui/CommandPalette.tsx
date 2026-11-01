@@ -11,6 +11,7 @@ import {
   Folder,
   FileText,
   PlayCircle,
+  BookOpen,
 } from "lucide-react";
 
 interface Cmd {
@@ -117,6 +118,7 @@ export function CommandPalette() {
       { id: "projects", label: "Projects", hint: "Go to projects", icon: FolderKanban, run: () => go("/projects") },
       { id: "workspace", label: "Workspace", hint: "Members, roles, groups", icon: Users, run: () => go("/workspace") },
       { id: "dashboards", label: "Dashboards", hint: "Global metrics", icon: LayoutDashboard, run: () => go("/dashboards") },
+      { id: "api-docs", label: "API Documentation", hint: "REST API v1 reference & OpenAPI spec", icon: BookOpen, run: () => go("/docs/api") },
     ];
     const projectCmds: Cmd[] = projects.map((p) => ({
       id: `prj-${p.code}`,
