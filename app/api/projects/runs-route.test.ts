@@ -19,6 +19,12 @@ vi.mock("@/lib/prisma", () => ({
     testRun: {
       create: vi.fn(),
     },
+    projectMember: {
+      findMany: vi.fn(),
+    },
+    notification: {
+      createMany: vi.fn(),
+    },
   },
 }));
 
@@ -45,6 +51,8 @@ const projectFindFirst = prisma.project.findFirst as unknown as Mock;
 const testCaseFindMany = prisma.testCase.findMany as unknown as Mock;
 const testPlanFindFirst = prisma.testPlan.findFirst as unknown as Mock;
 const testRunCreate = prisma.testRun.create as unknown as Mock;
+const projectMemberFindMany = prisma.projectMember.findMany as unknown as Mock;
+const notificationCreateMany = prisma.notification.createMany as unknown as Mock;
 
 const params = (code = "PRO") => ({ params: Promise.resolve({ code }) });
 const req = (body: unknown) =>
@@ -63,6 +71,7 @@ describe("project runs API route", () => {
     mockedRequireProjectRole.mockResolvedValue(true);
     testCaseFindMany.mockResolvedValue([{ id: "case-1" }]);
     testRunCreate.mockResolvedValue({ id: "run-1", title: "Regression", results: [] });
+    projectMemberFindMany.mockResolvedValue([{ userId: "user-1" }, { userId: "user-2" }]);
     mockedLogAudit.mockResolvedValue(undefined);
   });
 
@@ -168,5 +177,18 @@ describe("project runs API route", () => {
         entity: "TEST_RUN",
       }),
     );
+    expect(notificationCreateMany).toHaveBeenCalledWith({
+      data: [
+        {
+          recipientId: "user-2",
+          actorId: "user-1",
+          type: "RUN_STARTED",
+          entityId: "run-1",
+          link: "/projects/PRO/runs/run-1",
+          title: "New Test Run Started: Regression",
+          message: "2 test case(s) ready for execution in PRO",
+        },
+      ],
+    });
   });
 });

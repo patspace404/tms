@@ -85,7 +85,8 @@ export async function PATCH(
     const actorId = session?.user ? (session.user as any).id : null;
 
     const existingCase = await prisma.testCase.findUnique({
-      where: { id: caseId }
+      where: { id: caseId },
+      include: { project: { select: { code: true } } },
     });
 
     const updatedCase = await prisma.$transaction(async (tx) => {
@@ -143,15 +144,19 @@ export async function PATCH(
         existingCase.authorId !== newAuthorId &&
         newAuthorId !== actorId // Don't notify if assigning to self
       ) {
+        const projectCode = existingCase.project?.code;
         await tx.notification.create({
           data: {
             recipientId: newAuthorId,
             actorId: actorId,
             type: "ASSIGNMENT",
             entityId: updated.id,
+            ...(projectCode
+              ? { link: `/projects/${projectCode}/cases/${updated.id}/edit` }
+              : {}),
             title: "Assigned Test Case",
             message: `You have been assigned to test case: ${updated.title}`,
-          }
+          },
         });
       }
 

@@ -14,6 +14,9 @@ vi.mock("@/lib/prisma", () => ({
       update: vi.fn(),
       create: vi.fn(),
     },
+    notification: {
+      createMany: vi.fn(),
+    },
   },
 }));
 
@@ -30,6 +33,7 @@ const mockedRequireRunAccess = vi.mocked(requireRunAccess);
 const testRunFindUnique = prisma.testRun.findUnique as unknown as Mock;
 const testRunUpdate = prisma.testRun.update as unknown as Mock;
 const testRunCreate = prisma.testRun.create as unknown as Mock;
+const notificationCreateMany = prisma.notification.createMany as unknown as Mock;
 
 const params = (runId = "run-1") => ({ params: Promise.resolve({ runId }) });
 const req = (body?: unknown) =>
@@ -120,6 +124,49 @@ describe("run lifecycle API routes", () => {
         body: expect.stringContaining('"Failed","value":"1"'),
       }),
     );
+  });
+
+  it("notifies run author and assignees (excluding actor) when a run completes", async () => {
+    testRunFindUnique.mockResolvedValue({
+      id: "run-1",
+      title: "Regression",
+      authorId: "author-1",
+      results: [
+        { status: "PASSED", assigneeId: "assignee-1" },
+        { status: "FAILED", assigneeId: "actor-1" },
+      ],
+      project: {
+        code: "PRO",
+        name: "Project",
+        msTeamsWebhookUrl: null,
+      },
+    });
+
+    const response = await completeRun(req(), params());
+
+    expect(response.status).toBe(200);
+    expect(notificationCreateMany).toHaveBeenCalledWith({
+      data: [
+        {
+          recipientId: "author-1",
+          actorId: "actor-1",
+          type: "RUN_COMPLETED",
+          entityId: "run-1",
+          link: "/projects/PRO/runs/run-1",
+          title: "Test Run Completed: Regression",
+          message: "Pass rate 50% (1/2 passed, 1 failed)",
+        },
+        {
+          recipientId: "assignee-1",
+          actorId: "actor-1",
+          type: "RUN_COMPLETED",
+          entityId: "run-1",
+          link: "/projects/PRO/runs/run-1",
+          title: "Test Run Completed: Regression",
+          message: "Pass rate 50% (1/2 passed, 1 failed)",
+        },
+      ],
+    });
   });
 
   it("requires auth before reopening runs", async () => {

@@ -162,9 +162,11 @@ describe("run result API routes", () => {
   });
 
   it("notifies a newly assigned user when assignment changes to someone else", async () => {
-    resultFindUnique
-      .mockResolvedValueOnce({ assigneeId: null })
-      .mockResolvedValueOnce({ assigneeId: null, testCase: { title: "Checkout works" } });
+    resultFindUnique.mockResolvedValueOnce({
+      assigneeId: null,
+      testRun: { project: { code: "PRO" } },
+      testCase: { title: "Checkout works" },
+    });
     resultUpdate.mockResolvedValue({ id: "result-1", assigneeId: "user-2" });
 
     const response = await PATCH(req({ status: "FAILED", assigneeId: "user-2" }), params());
@@ -176,6 +178,7 @@ describe("run result API routes", () => {
         actorId: "actor-1",
         type: "ASSIGNMENT",
         entityId: "result-1",
+        link: "/projects/PRO/runs/run-1",
       }),
     });
   });

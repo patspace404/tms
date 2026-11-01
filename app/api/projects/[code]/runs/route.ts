@@ -133,6 +133,30 @@ export async function POST(
       details: `Created Test Run: ${run.title}`,
     });
 
+    if (prisma.projectMember?.findMany && prisma.notification?.createMany) {
+      const members = await prisma.projectMember.findMany({
+        where: { projectId: project.id },
+        select: { userId: true },
+      });
+      const recipientIds = members
+        .map((m) => m.userId)
+        .filter((id) => id !== userId);
+
+      if (recipientIds.length > 0) {
+        await prisma.notification.createMany({
+          data: recipientIds.map((recipientId) => ({
+            recipientId,
+            actorId: userId,
+            type: "RUN_STARTED" as const,
+            entityId: run.id,
+            link: `/projects/${project.code}/runs/${run.id}`,
+            title: `New Test Run Started: ${run.title}`,
+            message: `${uniqueCaseIds.length} test case(s) ready for execution in ${project.code}`,
+          })),
+        });
+      }
+    }
+
     return NextResponse.json(run, { status: 201 });
   } catch (error) {
     console.error("Failed to create run", error);

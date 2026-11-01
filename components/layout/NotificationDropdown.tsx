@@ -2,8 +2,16 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import useSWR from "swr";
-import { Bell, Check, Circle, ExternalLink } from "lucide-react";
-import Link from "next/link";
+import {
+  Bell,
+  Check,
+  Circle,
+  UserCheck,
+  AtSign,
+  PlayCircle,
+  CheckCircle2,
+  Info,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 
 // Define the notification type based on Prisma schema
@@ -105,6 +113,21 @@ export default function NotificationDropdown() {
     return `${Math.floor(diffInSeconds / 86400)}d ago`;
   };
 
+  const getTypeIcon = (type: Notification["type"]) => {
+    switch (type) {
+      case "ASSIGNMENT":
+        return <UserCheck className="w-4 h-4 text-primary" />;
+      case "MENTION":
+        return <AtSign className="w-4 h-4 text-amber-500" />;
+      case "RUN_STARTED":
+        return <PlayCircle className="w-4 h-4 text-blue-500" />;
+      case "RUN_COMPLETED":
+        return <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
+      default:
+        return <Info className="w-4 h-4 text-text-muted" />;
+    }
+  };
+
   return (
     <div className="relative" ref={dropdownRef}>
       {/* Bell Button */}
@@ -149,11 +172,12 @@ export default function NotificationDropdown() {
                       !notification.isRead ? "bg-primary-light/70" : ""
                     }`}
                   >
-                    <div className="flex-shrink-0 mt-1">
-                      {!notification.isRead ? (
-                        <Circle className="w-2.5 h-2.5 fill-primary text-primary" />
-                      ) : (
-                        <Circle className="w-2.5 h-2.5 text-border" />
+                    <div className="flex-shrink-0 mt-0.5 relative">
+                      <div className="w-7 h-7 rounded-lg bg-surface-2 border border-border/60 flex items-center justify-center">
+                        {getTypeIcon(notification.type)}
+                      </div>
+                      {!notification.isRead && (
+                        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-primary ring-2 ring-surface" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">

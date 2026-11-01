@@ -75,6 +75,11 @@ export async function PATCH(
       select: {
         assigneeId: true,
         stepResults: true,
+        testRun: {
+          select: {
+            project: { select: { code: true } },
+          },
+        },
         testCase: {
           select: { title: true, steps: { select: { id: true } } },
         },
@@ -131,12 +136,14 @@ export async function PATCH(
       actor &&
       assigneeId !== actor.id
     ) {
+      const projectCode = currentResult.testRun?.project?.code;
       await prisma.notification.create({
         data: {
           recipientId: assigneeId,
           actorId: actor.id,
           type: "ASSIGNMENT",
           entityId: resultId,
+          ...(projectCode ? { link: `/projects/${projectCode}/runs/${runId}` } : {}),
           title: "Assigned Test Run",
           message: `You have been assigned to execute test case: ${currentResult.testCase?.title || "Unknown"}`,
         },

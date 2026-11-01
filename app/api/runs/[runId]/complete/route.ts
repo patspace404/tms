@@ -40,23 +40,52 @@ export async function POST(
       },
     });
 
-    // 3. Send MS Teams Notification if configured
-    if (run.project.msTeamsWebhookUrl) {
-      // Calculate Stats
-      const total = run.results.length;
-      let passed = 0;
-      let failed = 0;
-      let skipped = 0;
-      let blocked = 0;
+    // Calculate Stats
+    const total = run.results.length;
+    let passed = 0;
+    let failed = 0;
+    let skipped = 0;
+    let blocked = 0;
 
+    run.results.forEach((res) => {
+      if (res.status === "PASSED") passed++;
+      else if (res.status === "FAILED") failed++;
+      else if (res.status === "SKIPPED") skipped++;
+      else if (res.status === "BLOCKED") blocked++;
+    });
+
+    const passRate = total > 0 ? Math.round((passed / total) * 100) : 0;
+
+    // 3. Send In-App Notifications to run author & assignees (excluding actor)
+    if ( prisma.notification?.createMany ) {
+      const actorId = access.userId;
+      const recipientIds = new Set<string>();
+      if (run.authorId && run.authorId !== actorId) {
+        recipientIds.add(run.authorId);
+      }
       run.results.forEach((res) => {
-        if (res.status === "PASSED") passed++;
-        else if (res.status === "FAILED") failed++;
-        else if (res.status === "SKIPPED") skipped++;
-        else if (res.status === "BLOCKED") blocked++;
+        if (res.assigneeId && res.assigneeId !== actorId) {
+          recipientIds.add(res.assigneeId);
+        }
       });
 
-      const passRate = total > 0 ? Math.round((passed / total) * 100) : 0;
+      if (recipientIds.size > 0) {
+        await prisma.notification.createMany({
+          data: Array.from(recipientIds).map((recipientId) => ({
+            recipientId,
+            actorId,
+            type: "RUN_COMPLETED" as const,
+            entityId: run.id,
+            link: `/projects/${run.project.code}/runs/${run.id}`,
+            title: `Test Run Completed: ${run.title}`,
+            message: `Pass rate ${passRate}% (${passed}/${total} passed, ${failed} failed)`,
+          })),
+        });
+      }
+    }
+
+    // 4. Send MS Teams Notification if configured
+    if (run.project.msTeamsWebhookUrl) {
       const themeColor = failed > 0 ? "E81123" : "00CC6A"; // Red if any failed, Green if all passed/skipped
 
       // Determine base URL dynamically or use NEXTAUTH_URL
