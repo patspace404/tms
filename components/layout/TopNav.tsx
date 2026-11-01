@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { ChevronDown, Search, User, LogOut, KeyRound } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CommandPalette } from "@/components/ui/CommandPalette";
+import NotificationDropdown from "@/components/layout/NotificationDropdown";
 import { initialsOf } from "@/lib/initials";
 import { BrandTile } from "@/components/ui/BrandMark";
 
@@ -108,6 +109,8 @@ export function TopNav() {
           </button>
 
           <ThemeToggle isCollapsed />
+
+          <NotificationDropdown />
 
           <div className="relative flex items-center ml-1">
             <button
