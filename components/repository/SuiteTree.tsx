@@ -14,6 +14,7 @@ import {
   Trash2,
   Pencil,
   GripVertical,
+  ChevronsDownUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Suite } from "@/types/repository";
@@ -282,11 +283,8 @@ const SuiteItem = ({
         </div>
       </div>
 
-      <div
-        className="grid transition-all duration-300 ease-in-out"
-        style={{ gridTemplateRows: isOpen && hasExpandable ? "1fr" : "0fr" }}
-      >
-        <div className="overflow-hidden">
+      {isOpen && hasExpandable && (
+        <div>
           {hasChildSuites &&
             suite.children!.map((child: any) => (
               <SuiteItem
@@ -402,7 +400,7 @@ const SuiteItem = ({
               );
             })}
         </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -436,7 +434,8 @@ export const SuiteTree = ({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { role } = useProjectRole();
-  const { expandAll, collapseAll, isExpanded, toggleSuite } = useSuiteExpansion();
+  const { expandedSuites, expandAll, collapseAll, isExpanded, toggleSuite } =
+    useSuiteExpansion();
   const {
     activeCaseId,
     setActiveCaseId,
@@ -912,14 +911,26 @@ export const SuiteTree = ({
         <span className="font-bold text-[14.5px]">
           Suites
         </span>
-        {role !== "VIEWER" && (
-          <button
-            onClick={() => handleOpenCreateModal(null)}
-            className="text-text-faint hover:text-text-main"
-          >
-            <FolderPlus size={19} strokeWidth={2} />
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {expandedSuites.size > 0 && (
+            <button
+              onClick={() => collapseAll([])}
+              title="Collapse all suites"
+              className="text-text-faint hover:text-text-main transition-colors"
+            >
+              <ChevronsDownUp size={17} strokeWidth={2} />
+            </button>
+          )}
+          {role !== "VIEWER" && (
+            <button
+              onClick={() => handleOpenCreateModal(null)}
+              title="Create root suite"
+              className="text-text-faint hover:text-text-main transition-colors"
+            >
+              <FolderPlus size={19} strokeWidth={2} />
+            </button>
+          )}
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto">
         {suiteTree.map((suite) => (
