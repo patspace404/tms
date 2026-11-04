@@ -41,12 +41,67 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { title, description } = body;
+    const { title, description, parentId, position, orderedSiblingIds } = body;
+
+    // Validate parentId if provided (can be string or null)
+    if (parentId !== undefined && parentId !== null) {
+      if (parentId === suiteId) {
+        return NextResponse.json(
+          { error: "Cannot move a suite into itself" },
+          { status: 400 },
+        );
+      }
+
+      const targetParent = await prisma.testSuite.findUnique({
+        where: { id: parentId },
+      });
+
+      if (!targetParent || (targetParent.projectId && targetParent.projectId !== project.id)) {
+        return NextResponse.json(
+          { error: "Target parent suite not found" },
+          { status: 400 },
+        );
+      }
+
+      // Walk up ancestors of targetParent to prevent circular hierarchy
+      let cursorId: string | null = targetParent.parentId;
+      while (cursorId) {
+        if (cursorId === suiteId) {
+          return NextResponse.json(
+            { error: "Cannot move a suite into one of its child suites" },
+            { status: 400 },
+          );
+        }
+        const ancestor = await prisma.testSuite.findUnique({
+          where: { id: cursorId },
+          select: { parentId: true },
+        });
+        cursorId = ancestor?.parentId ?? null;
+      }
+    }
+
+    const updateData: Record<string, any> = {};
+    if (title !== undefined) updateData.title = title;
+    if (description !== undefined) updateData.description = description;
+    if (parentId !== undefined) updateData.parentId = parentId;
+    if (typeof position === "number") updateData.position = position;
 
     const suite = await prisma.testSuite.update({
       where: { id: suiteId },
-      data: { title, description },
+      data: updateData,
     });
+
+    if (Array.isArray(orderedSiblingIds) && orderedSiblingIds.length > 0) {
+      for (let idx = 0; idx < orderedSiblingIds.length; idx++) {
+        const sibId = orderedSiblingIds[idx];
+        if (typeof sibId === "string" && sibId !== suiteId) {
+          await prisma.testSuite.update({
+            where: { id: sibId },
+            data: { position: idx },
+          });
+        }
+      }
+    }
 
     return NextResponse.json(suite);
   } catch (error) {

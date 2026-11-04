@@ -106,6 +106,52 @@ describe("PATCH /api/projects/[code]/suites/[suiteId]", () => {
       expect.objectContaining({ where: { id: "suite-001" }, data: expect.objectContaining({ title: "New Title" }) })
     );
   });
+
+  it("moves suite to a new parentId and updates sibling positions", async () => {
+    sessionMock.getServerSession.mockResolvedValue({ user: fakeUser });
+    suiteMock.findUnique.mockResolvedValue({ id: "suite-parent", parentId: null, projectId: "proj-fin" });
+    suiteMock.update.mockResolvedValue({ id: "suite-001", parentId: "suite-parent", position: 1 });
+
+    const res = await PATCH(
+      jsonRequest("PATCH", "FIN", "suite-001", {
+        parentId: "suite-parent",
+        position: 1,
+        orderedSiblingIds: ["suite-002", "suite-001"],
+      }),
+      routeParams("FIN", "suite-001")
+    );
+
+    expect(res.status).toBe(200);
+    expect(suiteMock.update).toHaveBeenCalledWith({
+      where: { id: "suite-001" },
+      data: { parentId: "suite-parent", position: 1 },
+    });
+    expect(suiteMock.update).toHaveBeenCalledWith({
+      where: { id: "suite-002" },
+      data: { position: 0 },
+    });
+  });
+
+  it("rejects moving a suite into itself or its descendant", async () => {
+    sessionMock.getServerSession.mockResolvedValue({ user: fakeUser });
+
+    const selfRes = await PATCH(
+      jsonRequest("PATCH", "FIN", "suite-001", { parentId: "suite-001" }),
+      routeParams("FIN", "suite-001")
+    );
+    expect(selfRes.status).toBe(400);
+
+    suiteMock.findUnique
+      .mockResolvedValueOnce({ id: "suite-grandchild", parentId: "suite-child", projectId: "proj-fin" })
+      .mockResolvedValueOnce({ parentId: "suite-001" });
+
+    const cycleRes = await PATCH(
+      jsonRequest("PATCH", "FIN", "suite-001", { parentId: "suite-grandchild" }),
+      routeParams("FIN", "suite-001")
+    );
+    expect(cycleRes.status).toBe(400);
+    expect(suiteMock.update).not.toHaveBeenCalled();
+  });
 });
 
 describe("DELETE /api/projects/[code]/suites/[suiteId]", () => {

@@ -13,6 +13,7 @@ import {
   FileText,
   Trash2,
   Pencil,
+  GripVertical,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Suite } from "@/types/repository";
@@ -22,6 +23,8 @@ import { useProjectRole } from "@/components/providers/ProjectRoleProvider";
 import { useSuiteExpansion } from "@/components/providers/SuiteExpansionProvider";
 import { DeleteSuiteModal } from "@/components/repository/DeleteSuiteModal";
 
+type DropPosition = "before" | "inside" | "after";
+
 interface SuiteItemProps {
   suite: any;
   level: number;
@@ -30,6 +33,13 @@ interface SuiteItemProps {
   onAddChild: (parentId: string) => void;
   onDeleteClick: (suite: any) => void;
   onRename: (suiteId: string, title: string) => Promise<void>;
+  draggedSuiteId: string | null;
+  dropTarget: { suiteId: string; position: DropPosition } | null;
+  onDragStartSuite: (suiteId: string) => void;
+  onDragOverSuite: (e: React.DragEvent, targetSuite: any) => void;
+  onDragLeaveSuite: (suiteId: string) => void;
+  onDropSuite: (e: React.DragEvent, targetSuite: any) => void;
+  onDragEndSuite: () => void;
 }
 
 const SuiteItem = ({
@@ -40,6 +50,13 @@ const SuiteItem = ({
   onAddChild,
   onDeleteClick,
   onRename,
+  draggedSuiteId,
+  dropTarget,
+  onDragStartSuite,
+  onDragOverSuite,
+  onDragLeaveSuite,
+  onDropSuite,
+  onDragEndSuite,
 }: SuiteItemProps) => {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
@@ -72,19 +89,81 @@ const SuiteItem = ({
   const hasChildren = suite.children && suite.children.length > 0;
 
   const isActive = selectedSuiteId === suite.id;
+  const canDrag = role !== "VIEWER" && suite.id !== "unassigned" && !editing;
+  const isDragged = draggedSuiteId === suite.id;
+  const isDropBefore =
+    dropTarget?.suiteId === suite.id && dropTarget.position === "before";
+  const isDropAfter =
+    dropTarget?.suiteId === suite.id && dropTarget.position === "after";
+  const isDropInside =
+    dropTarget?.suiteId === suite.id && dropTarget.position === "inside";
 
   return (
-    <div className="select-none group/item">
+    <div className={cn("select-none group/item", isDragged && "opacity-45")}>
       <div
+        draggable={canDrag}
+        onDragStart={(e) => {
+          if (!canDrag) {
+            e.preventDefault();
+            return;
+          }
+          e.stopPropagation();
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", suite.id);
+          onDragStartSuite(suite.id);
+        }}
+        onDragOver={(e) => {
+          if (suite.id === "unassigned") return;
+          onDragOverSuite(e, suite);
+        }}
+        onDragLeave={() => {
+          if (suite.id === "unassigned") return;
+          onDragLeaveSuite(suite.id);
+        }}
+        onDrop={(e) => {
+          if (suite.id === "unassigned") return;
+          onDropSuite(e, suite);
+        }}
+        onDragEnd={onDragEndSuite}
         onClick={() =>
           router.push(`/projects/${projectCode}/repository?suite=${suite.id}`)
         }
         className={cn(
           "flex items-center gap-[7px] py-[7px] pr-[14px] cursor-pointer transition-colors relative rounded-none",
-          isActive ? "bg-primary-soft text-primary-text" : "hover:bg-surface-hover text-text-main"
+          isActive
+            ? "bg-primary-soft text-primary-text"
+            : "hover:bg-surface-hover text-text-main",
+          isDropInside && "bg-primary-soft/80 ring-2 ring-inset ring-primary",
         )}
-        style={{ paddingLeft: `${level * 18 + 14}px`, boxShadow: isActive ? 'inset 3px 0 0 var(--primary)' : 'none' }}
+        style={{
+          paddingLeft: `${level * 18 + 10}px`,
+          boxShadow: isActive ? "inset 3px 0 0 var(--primary)" : "none",
+        }}
       >
+        {isDropBefore && (
+          <div
+            className="pointer-events-none absolute top-0 right-2 h-[2px] bg-primary z-20"
+            style={{ left: `${level * 18 + 14}px` }}
+          >
+            <span className="absolute -left-1 -top-[3px] h-2 w-2 rounded-full bg-primary" />
+          </div>
+        )}
+        {isDropAfter && (
+          <div
+            className="pointer-events-none absolute bottom-0 right-2 h-[2px] bg-primary z-20"
+            style={{ left: `${level * 18 + 14}px` }}
+          >
+            <span className="absolute -left-1 -top-[3px] h-2 w-2 rounded-full bg-primary" />
+          </div>
+        )}
+        {canDrag && (
+          <span
+            className="opacity-0 group-hover/item:opacity-60 hover:!opacity-100 cursor-grab active:cursor-grabbing text-text-faint shrink-0 -ml-1"
+            title="Drag to move or reorder suite"
+          >
+            <GripVertical size={13} />
+          </span>
+        )}
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -210,6 +289,13 @@ const SuiteItem = ({
                 onAddChild={onAddChild}
                 onDeleteClick={onDeleteClick}
                 onRename={onRename}
+                draggedSuiteId={draggedSuiteId}
+                dropTarget={dropTarget}
+                onDragStartSuite={onDragStartSuite}
+                onDragOverSuite={onDragOverSuite}
+                onDragLeaveSuite={onDragLeaveSuite}
+                onDropSuite={onDropSuite}
+                onDragEndSuite={onDragEndSuite}
               />
             ))}
         </div>
@@ -234,6 +320,11 @@ export const SuiteTree = ({
   const [isCreating, setIsCreating] = useState(false);
   const [suiteToDelete, setSuiteToDelete] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [draggedSuiteId, setDraggedSuiteId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{
+    suiteId: string;
+    position: DropPosition;
+  } | null>(null);
 
   React.useEffect(() => {
     setSuites(initialSuites);
@@ -241,7 +332,7 @@ export const SuiteTree = ({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { role } = useProjectRole();
-  const { expandAll, collapseAll } = useSuiteExpansion();
+  const { expandAll, collapseAll, isExpanded, toggleSuite } = useSuiteExpansion();
   const selectedSuiteId = searchParams.get("suite");
 
   // Build tree from flat array and calculate case counts
@@ -255,10 +346,13 @@ export const SuiteTree = ({
       const sId = tc.suiteId || "unassigned";
       casesBySuite.set(sId, (casesBySuite.get(sId) || 0) + 1);
     });
-    flatList.forEach((item) => {
+    const sortedList = [...flatList].sort(
+      (a, b) => (a.position ?? 0) - (b.position ?? 0),
+    );
+    sortedList.forEach((item) => {
       map.set(item.id, { ...item, children: [] });
     });
-    flatList.forEach((item) => {
+    sortedList.forEach((item) => {
       const node = map.get(item.id);
       if (item.parentId) {
         if (map.has(item.parentId)) {
@@ -322,6 +416,143 @@ export const SuiteTree = ({
       ids = ids.concat(getDescendantIds(c.id));
     });
     return ids;
+  };
+
+  const handleDragStartSuite = (suiteId: string) => {
+    setDraggedSuiteId(suiteId);
+  };
+
+  const handleDragOverSuite = (e: React.DragEvent, targetSuite: any) => {
+    if (!draggedSuiteId || draggedSuiteId === targetSuite.id) return;
+
+    // Prevent dropping onto own descendants
+    const descendants = getDescendantIds(draggedSuiteId);
+    if (descendants.includes(targetSuite.id)) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const offsetY = e.clientY - rect.top;
+    const height = rect.height || 1;
+    const ratio = offsetY / height;
+
+    let position: DropPosition = "inside";
+    if (ratio < 0.28) {
+      position = "before";
+    } else if (ratio > 0.72) {
+      position = "after";
+    }
+
+    if (
+      dropTarget?.suiteId !== targetSuite.id ||
+      dropTarget?.position !== position
+    ) {
+      setDropTarget({ suiteId: targetSuite.id, position });
+    }
+  };
+
+  const handleDragLeaveSuite = (suiteId: string) => {
+    if (dropTarget?.suiteId === suiteId) {
+      setDropTarget(null);
+    }
+  };
+
+  const handleDragEndSuite = () => {
+    setDraggedSuiteId(null);
+    setDropTarget(null);
+  };
+
+  const handleDropSuite = async (e: React.DragEvent, targetSuite: any) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const sourceId = draggedSuiteId || e.dataTransfer.getData("text/plain");
+    const position = dropTarget?.position || "inside";
+    setDraggedSuiteId(null);
+    setDropTarget(null);
+
+    if (!sourceId || sourceId === targetSuite.id) return;
+
+    const descendants = getDescendantIds(sourceId);
+    if (descendants.includes(targetSuite.id)) {
+      toast.error("Cannot move a suite inside its own child suite");
+      return;
+    }
+
+    const sourceSuite = suites.find((s) => s.id === sourceId);
+    if (!sourceSuite) return;
+
+    const newParentId: string | null =
+      position === "inside" ? targetSuite.id : (targetSuite.parentId ?? null);
+
+    // Get existing siblings in the destination parent (excluding source)
+    const siblings = suites
+      .filter((s) => (s.parentId ?? null) === newParentId && s.id !== sourceId)
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+
+    let insertIndex = siblings.length;
+    if (position === "before" || position === "after") {
+      const targetIdx = siblings.findIndex((s) => s.id === targetSuite.id);
+      if (targetIdx !== -1) {
+        insertIndex = position === "before" ? targetIdx : targetIdx + 1;
+      }
+    }
+
+    const orderedSiblings = [...siblings];
+    orderedSiblings.splice(insertIndex, 0, {
+      ...sourceSuite,
+      parentId: newParentId,
+    });
+    const orderedSiblingIds = orderedSiblings.map((s) => s.id);
+    const positionMap = new Map<string, number>();
+    orderedSiblingIds.forEach((id, idx) => positionMap.set(id, idx));
+
+    const previousSuites = suites;
+    setSuites((prev) =>
+      prev.map((s) => {
+        if (s.id === sourceId) {
+          return {
+            ...s,
+            parentId: newParentId,
+            position: positionMap.get(s.id) ?? 0,
+          };
+        }
+        if (positionMap.has(s.id)) {
+          return { ...s, position: positionMap.get(s.id)! };
+        }
+        return s;
+      }),
+    );
+
+    if (position === "inside" && !isExpanded(targetSuite.id)) {
+      toggleSuite(targetSuite.id);
+    }
+
+    try {
+      const res = await fetch(
+        `/api/projects/${projectCode}/suites/${sourceId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            parentId: newParentId,
+            position: positionMap.get(sourceId) ?? 0,
+            orderedSiblingIds,
+          }),
+        },
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to move suite");
+      }
+      toast.success("Suite moved");
+      router.refresh();
+    } catch (err) {
+      setSuites(previousSuites);
+      toast.error(err instanceof Error ? err.message : "Failed to move suite");
+    }
   };
 
   const handleRenameSuite = async (suiteId: string, title: string) => {
@@ -450,6 +681,13 @@ export const SuiteTree = ({
             onAddChild={handleOpenCreateModal}
             onDeleteClick={setSuiteToDelete}
             onRename={handleRenameSuite}
+            draggedSuiteId={draggedSuiteId}
+            dropTarget={dropTarget}
+            onDragStartSuite={handleDragStartSuite}
+            onDragOverSuite={handleDragOverSuite}
+            onDragLeaveSuite={handleDragLeaveSuite}
+            onDropSuite={handleDropSuite}
+            onDragEndSuite={handleDragEndSuite}
           />
         ))}
         {unassignedCount > 0 && (
@@ -467,6 +705,13 @@ export const SuiteTree = ({
             onAddChild={() => {}}
             onDeleteClick={() => {}}
             onRename={async () => {}}
+            draggedSuiteId={null}
+            dropTarget={null}
+            onDragStartSuite={() => {}}
+            onDragOverSuite={() => {}}
+            onDragLeaveSuite={() => {}}
+            onDropSuite={() => {}}
+            onDragEndSuite={() => {}}
           />
         )}
       </div>
