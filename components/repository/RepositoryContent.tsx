@@ -57,7 +57,7 @@ interface RepositoryContentProps {
 export function RepositoryContent({
   projectCode,
   suites,
-  cases,
+  cases: initialCases,
   activeSuiteId,
   initialCaseId,
   totalCases,
@@ -65,7 +65,29 @@ export function RepositoryContent({
 }: RepositoryContentProps) {
   const router = useRouter();
   const { role } = useProjectRole();
-  const [activeTestCaseId, setActiveTestCaseId] = useState<string | null>(initialCaseId ?? null);
+  const {
+    selectedCases,
+    clearSelection,
+    activeCaseId: activeTestCaseId,
+    setActiveCaseId: setActiveTestCaseId,
+    caseSuiteOverrides,
+  } = useSuiteSelection();
+
+  const cases = React.useMemo(
+    () =>
+      initialCases.map((tc) =>
+        Object.prototype.hasOwnProperty.call(caseSuiteOverrides, tc.id)
+          ? { ...tc, suiteId: caseSuiteOverrides[tc.id] }
+          : tc,
+      ),
+    [initialCases, caseSuiteOverrides],
+  );
+
+  React.useEffect(() => {
+    if (initialCaseId) {
+      setActiveTestCaseId(initialCaseId);
+    }
+  }, [initialCaseId]);
   const [detailTab, setDetailTab] = useState<
     "general" | "defects" | "comments" | "history"
   >("general");
@@ -141,7 +163,6 @@ export function RepositoryContent({
   const [confirmSync, setConfirmSync] = useState(false);
   const [confirmDeleteCase, setConfirmDeleteCase] = useState(false);
 
-  const { selectedCases, clearSelection } = useSuiteSelection();
   const hasSelection = selectedCases.size > 0;
 
   const handleBulkDelete = async () => {

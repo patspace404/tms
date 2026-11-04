@@ -65,7 +65,7 @@ export default async function RepositoryPage({
 
   return (
     <SuiteExpansionProvider initialExpandedIds={allSuiteIds} projectCode={code}>
-      <SuiteSelectionProvider>
+      <SuiteSelectionProvider initialActiveCaseId={targetCase?.id ?? null}>
         <div className="flex min-h-0 flex-1 w-full bg-background overflow-hidden">
           <ResizableSidebar storageKey="qmaster.repository.sidebarWidth">
             <SuiteTree

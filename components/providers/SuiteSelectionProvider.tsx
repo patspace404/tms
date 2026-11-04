@@ -9,14 +9,43 @@ interface SuiteSelectionContextType {
   isCaseSelected: (caseId: string) => boolean;
   areAllCasesSelected: (caseIds: string[]) => boolean;
   clearSelection: () => void;
+  activeCaseId: string | null;
+  setActiveCaseId: (caseId: string | null) => void;
+  caseSuiteOverrides: Record<string, string | null>;
+  setCaseSuiteOverride: (caseIds: string[], suiteId: string | null) => void;
 }
 
 const SuiteSelectionContext = createContext<
   SuiteSelectionContextType | undefined
 >(undefined);
 
-export function SuiteSelectionProvider({ children }: { children: ReactNode }) {
+export function SuiteSelectionProvider({
+  children,
+  initialActiveCaseId = null,
+}: {
+  children: ReactNode;
+  initialActiveCaseId?: string | null;
+}) {
   const [selectedCases, setSelectedCases] = useState<Set<string>>(new Set());
+  const [activeCaseId, setActiveCaseId] = useState<string | null>(
+    initialActiveCaseId,
+  );
+  const [caseSuiteOverrides, setCaseSuiteOverrides] = useState<
+    Record<string, string | null>
+  >({});
+
+  const setCaseSuiteOverride = (
+    caseIds: string[],
+    suiteId: string | null,
+  ) => {
+    setCaseSuiteOverrides((prev) => {
+      const next = { ...prev };
+      caseIds.forEach((id) => {
+        next[id] = suiteId;
+      });
+      return next;
+    });
+  };
 
   const toggleCase = (caseId: string) => {
     setSelectedCases((prev) => {
@@ -65,6 +94,10 @@ export function SuiteSelectionProvider({ children }: { children: ReactNode }) {
         isCaseSelected,
         areAllCasesSelected,
         clearSelection,
+        activeCaseId,
+        setActiveCaseId,
+        caseSuiteOverrides,
+        setCaseSuiteOverride,
       }}
     >
       {children}

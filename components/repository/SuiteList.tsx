@@ -19,6 +19,7 @@ import {
   Check,
   ArrowUp,
   ArrowDown,
+  GripVertical,
 } from "lucide-react";
 import { useSuiteSelection } from "@/components/providers/SuiteSelectionProvider";
 import { useProjectRole } from "@/components/providers/ProjectRoleProvider";
@@ -359,8 +360,28 @@ export function SuiteList({
             return (
               <div
                 key={tc.id}
+                draggable={role !== "VIEWER"}
+                onDragStart={(e) => {
+                  if (role === "VIEWER") {
+                    e.preventDefault();
+                    return;
+                  }
+                  const ids =
+                    selectedCases.has(tc.id) && selectedCases.size > 0
+                      ? Array.from(selectedCases)
+                      : [tc.id];
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData(
+                    "application/x-qmaster-cases",
+                    JSON.stringify(ids),
+                  );
+                  e.dataTransfer.setData(
+                    "text/plain",
+                    `cases:${JSON.stringify(ids)}`,
+                  );
+                }}
                 onClick={() => onSelectCase && onSelectCase(tc)}
-                className="grid gap-[12px] px-[18px] py-[9px] items-center border-b border-border cursor-pointer transition-colors hover:bg-surface-hover/60"
+                className="group/row grid gap-[12px] px-[18px] py-[9px] items-center border-b border-border cursor-pointer transition-colors hover:bg-surface-hover/60"
                 style={{
                   gridTemplateColumns: GRID,
                   background:
@@ -369,7 +390,15 @@ export function SuiteList({
                       : undefined,
                 }}
               >
-                <div className="flex items-center justify-center">
+                <div className="flex items-center justify-center gap-1">
+                  {role !== "VIEWER" && (
+                    <span
+                      className="opacity-0 group-hover/row:opacity-60 cursor-grab active:cursor-grabbing text-text-faint -ml-2 shrink-0"
+                      title="Drag to move case to another suite"
+                    >
+                      <GripVertical size={13} />
+                    </span>
+                  )}
                   <div
                     onClick={(e) => {
                       e.stopPropagation();

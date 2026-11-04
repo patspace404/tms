@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useProjectRole } from "@/components/providers/ProjectRoleProvider";
 import { useSuiteExpansion } from "@/components/providers/SuiteExpansionProvider";
+import { useSuiteSelection } from "@/components/providers/SuiteSelectionProvider";
 import { DeleteSuiteModal } from "@/components/repository/DeleteSuiteModal";
 
 type DropPosition = "before" | "inside" | "after";
@@ -30,12 +31,16 @@ interface SuiteItemProps {
   level: number;
   projectCode: string;
   selectedSuiteId: string | null;
+  activeCaseId: string | null;
+  onSelectCase: (caseId: string) => void;
   onAddChild: (parentId: string) => void;
   onDeleteClick: (suite: any) => void;
   onRename: (suiteId: string, title: string) => Promise<void>;
   draggedSuiteId: string | null;
+  draggedCaseId: string | null;
   dropTarget: { suiteId: string; position: DropPosition } | null;
   onDragStartSuite: (suiteId: string) => void;
+  onDragStartCase: (caseId: string) => void;
   onDragOverSuite: (e: React.DragEvent, targetSuite: any) => void;
   onDragLeaveSuite: (suiteId: string) => void;
   onDropSuite: (e: React.DragEvent, targetSuite: any) => void;
@@ -47,12 +52,16 @@ const SuiteItem = ({
   level,
   projectCode,
   selectedSuiteId,
+  activeCaseId,
+  onSelectCase,
   onAddChild,
   onDeleteClick,
   onRename,
   draggedSuiteId,
+  draggedCaseId,
   dropTarget,
   onDragStartSuite,
+  onDragStartCase,
   onDragOverSuite,
   onDragLeaveSuite,
   onDropSuite,
@@ -86,7 +95,9 @@ const SuiteItem = ({
   const { role } = useProjectRole();
   const { isExpanded, toggleSuite } = useSuiteExpansion();
   const isOpen = isExpanded(suite.id);
-  const hasChildren = suite.children && suite.children.length > 0;
+  const hasChildSuites = suite.children && suite.children.length > 0;
+  const hasDirectCases = suite.cases && suite.cases.length > 0;
+  const hasExpandable = hasChildSuites || hasDirectCases;
 
   const isActive = selectedSuiteId === suite.id;
   const canDrag = role !== "VIEWER" && suite.id !== "unassigned" && !editing;
@@ -109,19 +120,17 @@ const SuiteItem = ({
           }
           e.stopPropagation();
           e.dataTransfer.effectAllowed = "move";
-          e.dataTransfer.setData("text/plain", suite.id);
+          e.dataTransfer.setData("application/x-qmaster-suite", suite.id);
+          e.dataTransfer.setData("text/plain", `suite:${suite.id}`);
           onDragStartSuite(suite.id);
         }}
         onDragOver={(e) => {
-          if (suite.id === "unassigned") return;
           onDragOverSuite(e, suite);
         }}
         onDragLeave={() => {
-          if (suite.id === "unassigned") return;
           onDragLeaveSuite(suite.id);
         }}
         onDrop={(e) => {
-          if (suite.id === "unassigned") return;
           onDropSuite(e, suite);
         }}
         onDragEnd={onDragEndSuite}
@@ -172,7 +181,7 @@ const SuiteItem = ({
           className={cn(
             "p-0.5 rounded transition-colors shrink-0 flex items-center justify-center",
             isActive ? "text-primary-text" : "text-text-faint hover:text-text-muted",
-            hasChildren ? "visible" : "invisible"
+            hasExpandable ? "visible" : "invisible"
           )}
         >
           {isOpen ? (
@@ -275,10 +284,10 @@ const SuiteItem = ({
 
       <div
         className="grid transition-all duration-300 ease-in-out"
-        style={{ gridTemplateRows: isOpen && hasChildren ? "1fr" : "0fr" }}
+        style={{ gridTemplateRows: isOpen && hasExpandable ? "1fr" : "0fr" }}
       >
         <div className="overflow-hidden">
-          {hasChildren &&
+          {hasChildSuites &&
             suite.children!.map((child: any) => (
               <SuiteItem
                 key={child.id}
@@ -286,18 +295,112 @@ const SuiteItem = ({
                 level={level + 1}
                 projectCode={projectCode}
                 selectedSuiteId={selectedSuiteId}
+                activeCaseId={activeCaseId}
+                onSelectCase={onSelectCase}
                 onAddChild={onAddChild}
                 onDeleteClick={onDeleteClick}
                 onRename={onRename}
                 draggedSuiteId={draggedSuiteId}
+                draggedCaseId={draggedCaseId}
                 dropTarget={dropTarget}
                 onDragStartSuite={onDragStartSuite}
+                onDragStartCase={onDragStartCase}
                 onDragOverSuite={onDragOverSuite}
                 onDragLeaveSuite={onDragLeaveSuite}
                 onDropSuite={onDropSuite}
                 onDragEndSuite={onDragEndSuite}
               />
             ))}
+          {hasDirectCases &&
+            suite.cases!.map((tc: any) => {
+              const isCaseActive = activeCaseId === tc.id;
+              const isCaseDragged = draggedCaseId === tc.id;
+              const canDragCase = role !== "VIEWER";
+              const caseCode = `${projectCode}-${tc.sequenceNumber || tc.id.substring(0, 4)}`;
+              return (
+                <div
+                  key={tc.id}
+                  draggable={canDragCase}
+                  onDragStart={(e) => {
+                    if (!canDragCase) {
+                      e.preventDefault();
+                      return;
+                    }
+                    e.stopPropagation();
+                    e.dataTransfer.effectAllowed = "move";
+                    const ids = [tc.id];
+                    e.dataTransfer.setData(
+                      "application/x-qmaster-cases",
+                      JSON.stringify(ids),
+                    );
+                    e.dataTransfer.setData(
+                      "text/plain",
+                      `cases:${JSON.stringify(ids)}`,
+                    );
+                    onDragStartCase(tc.id);
+                  }}
+                  onDragOver={(e) => {
+                    if (
+                      draggedCaseId ||
+                      e.dataTransfer.types.includes(
+                        "application/x-qmaster-cases",
+                      )
+                    ) {
+                      onDragOverSuite(e, suite);
+                    }
+                  }}
+                  onDrop={(e) => {
+                    if (
+                      draggedCaseId ||
+                      e.dataTransfer.types.includes(
+                        "application/x-qmaster-cases",
+                      )
+                    ) {
+                      onDropSuite(e, suite);
+                    }
+                  }}
+                  onDragEnd={onDragEndSuite}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectCase(tc.id);
+                  }}
+                  className={cn(
+                    "group/case flex items-center gap-[6px] py-[5px] pr-[12px] cursor-pointer transition-colors text-[12.5px]",
+                    isCaseActive
+                      ? "bg-primary-soft text-primary-text font-medium"
+                      : "hover:bg-surface-hover text-text-muted hover:text-text-main",
+                    isCaseDragged && "opacity-45",
+                  )}
+                  style={{
+                    paddingLeft: `${(level + 1) * 18 + 18}px`,
+                    boxShadow: isCaseActive
+                      ? "inset 3px 0 0 var(--primary)"
+                      : "none",
+                  }}
+                  title={`${caseCode}: ${tc.title}`}
+                >
+                  {canDragCase && (
+                    <span
+                      className="opacity-0 group-hover/case:opacity-60 hover:!opacity-100 cursor-grab active:cursor-grabbing text-text-faint shrink-0 -ml-1"
+                      title="Drag to move test case to another suite"
+                    >
+                      <GripVertical size={12} />
+                    </span>
+                  )}
+                  <FileText
+                    size={13.5}
+                    className={cn(
+                      "shrink-0",
+                      isCaseActive ? "text-primary-text" : "text-text-faint",
+                    )}
+                  />
+                  <span className="qm-mono text-[11px] text-text-faint shrink-0 tabular-nums">
+                    {caseCode}
+                  </span>
+                  <span className="truncate flex-1">{tc.title}</span>
+                </div>
+              );
+            })}
         </div>
       </div>
     </div>
@@ -306,7 +409,7 @@ const SuiteItem = ({
 
 export const SuiteTree = ({
   initialSuites,
-  cases = [],
+  cases: initialCases = [],
   projectCode,
 }: {
   initialSuites: any[];
@@ -321,6 +424,7 @@ export const SuiteTree = ({
   const [suiteToDelete, setSuiteToDelete] = useState<any>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [draggedSuiteId, setDraggedSuiteId] = useState<string | null>(null);
+  const [draggedCaseId, setDraggedCaseId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{
     suiteId: string;
     position: DropPosition;
@@ -333,7 +437,24 @@ export const SuiteTree = ({
   const searchParams = useSearchParams();
   const { role } = useProjectRole();
   const { expandAll, collapseAll, isExpanded, toggleSuite } = useSuiteExpansion();
+  const {
+    activeCaseId,
+    setActiveCaseId,
+    caseSuiteOverrides,
+    setCaseSuiteOverride,
+    clearSelection,
+  } = useSuiteSelection();
   const selectedSuiteId = searchParams.get("suite");
+
+  const cases = React.useMemo(
+    () =>
+      initialCases.map((tc) =>
+        Object.prototype.hasOwnProperty.call(caseSuiteOverrides, tc.id)
+          ? { ...tc, suiteId: caseSuiteOverrides[tc.id] }
+          : tc,
+      ),
+    [initialCases, caseSuiteOverrides],
+  );
 
   // Build tree from flat array and calculate case counts
   const buildTree = (flatList: any[], allCases: any[]) => {
@@ -341,16 +462,24 @@ export const SuiteTree = ({
     const roots: any[] = [];
 
     // Group cases by suite
-    const casesBySuite = new Map<string, number>();
+    const casesBySuite = new Map<string, any[]>();
     allCases.forEach((tc) => {
       const sId = tc.suiteId || "unassigned";
-      casesBySuite.set(sId, (casesBySuite.get(sId) || 0) + 1);
+      if (!casesBySuite.has(sId)) casesBySuite.set(sId, []);
+      casesBySuite.get(sId)!.push(tc);
     });
+    casesBySuite.forEach((list) =>
+      list.sort((a, b) => (a.sequenceNumber ?? 0) - (b.sequenceNumber ?? 0)),
+    );
     const sortedList = [...flatList].sort(
       (a, b) => (a.position ?? 0) - (b.position ?? 0),
     );
     sortedList.forEach((item) => {
-      map.set(item.id, { ...item, children: [] });
+      map.set(item.id, {
+        ...item,
+        children: [],
+        cases: casesBySuite.get(item.id) || [],
+      });
     });
     sortedList.forEach((item) => {
       const node = map.get(item.id);
@@ -367,7 +496,7 @@ export const SuiteTree = ({
 
     // Recursively calculate counts
     const calculateCounts = (node: any) => {
-      let count = casesBySuite.get(node.id) || 0;
+      let count = (casesBySuite.get(node.id) || []).length;
       node.children.forEach((child: any) => {
         count += calculateCounts(child);
       });
@@ -384,10 +513,14 @@ export const SuiteTree = ({
     () => buildTree(suites, cases),
     [suites, cases],
   );
-  const unassignedCount = React.useMemo(
-    () => cases.filter((tc) => !tc.suiteId).length,
+  const unassignedCases = React.useMemo(
+    () =>
+      cases
+        .filter((tc) => !tc.suiteId)
+        .sort((a, b) => (a.sequenceNumber ?? 0) - (b.sequenceNumber ?? 0)),
     [cases],
   );
+  const unassignedCount = unassignedCases.length;
 
   const casesBySuiteId = React.useMemo(() => {
     const map = new Map<string, any[]>();
@@ -419,10 +552,34 @@ export const SuiteTree = ({
   };
 
   const handleDragStartSuite = (suiteId: string) => {
+    setDraggedCaseId(null);
     setDraggedSuiteId(suiteId);
   };
 
+  const handleDragStartCase = (caseId: string) => {
+    setDraggedSuiteId(null);
+    setDraggedCaseId(caseId);
+  };
+
+  const isDraggingCases = (e: React.DragEvent) =>
+    Boolean(draggedCaseId) ||
+    e.dataTransfer.types.includes("application/x-qmaster-cases");
+
   const handleDragOverSuite = (e: React.DragEvent, targetSuite: any) => {
+    if (isDraggingCases(e)) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = "move";
+      if (
+        dropTarget?.suiteId !== targetSuite.id ||
+        dropTarget?.position !== "inside"
+      ) {
+        setDropTarget({ suiteId: targetSuite.id, position: "inside" });
+      }
+      return;
+    }
+
+    if (targetSuite.id === "unassigned") return;
     if (!draggedSuiteId || draggedSuiteId === targetSuite.id) return;
 
     // Prevent dropping onto own descendants
@@ -461,16 +618,110 @@ export const SuiteTree = ({
 
   const handleDragEndSuite = () => {
     setDraggedSuiteId(null);
+    setDraggedCaseId(null);
     setDropTarget(null);
+  };
+
+  const extractDraggedCaseIds = (e: React.DragEvent): string[] | null => {
+    const raw = e.dataTransfer.getData("application/x-qmaster-cases");
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {
+        // ignore
+      }
+    }
+    const text = e.dataTransfer.getData("text/plain");
+    if (text?.startsWith("cases:")) {
+      try {
+        const parsed = JSON.parse(text.slice("cases:".length));
+        if (Array.isArray(parsed)) return parsed;
+      } catch {
+        // ignore
+      }
+    }
+    if (draggedCaseId) return [draggedCaseId];
+    return null;
   };
 
   const handleDropSuite = async (e: React.DragEvent, targetSuite: any) => {
     e.preventDefault();
     e.stopPropagation();
 
-    const sourceId = draggedSuiteId || e.dataTransfer.getData("text/plain");
+    const caseIds = extractDraggedCaseIds(e);
+    if (caseIds && caseIds.length > 0) {
+      setDraggedSuiteId(null);
+      setDraggedCaseId(null);
+      setDropTarget(null);
+
+      const targetSuiteId: string | null =
+        targetSuite.id === "unassigned" ? null : targetSuite.id;
+
+      // Filter to cases whose suite actually changes
+      const casesToMove = caseIds.filter((id) => {
+        const found = cases.find((tc) => tc.id === id);
+        return found && (found.suiteId ?? null) !== targetSuiteId;
+      });
+
+      if (casesToMove.length === 0) return;
+
+      const prevSuitesByCase = new Map<string, string | null>();
+      casesToMove.forEach((id) => {
+        const found = cases.find((tc) => tc.id === id);
+        prevSuitesByCase.set(id, found?.suiteId ?? null);
+      });
+
+      setCaseSuiteOverride(casesToMove, targetSuiteId);
+      clearSelection();
+
+      if (!isExpanded(targetSuite.id)) {
+        toggleSuite(targetSuite.id);
+      }
+
+      try {
+        const res = await fetch(`/api/projects/${projectCode}/cases/bulk`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            caseIds: casesToMove,
+            fields: { suiteId: targetSuiteId },
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to move test case(s)");
+        }
+        toast.success(
+          `Moved ${casesToMove.length} test case${casesToMove.length > 1 ? "s" : ""} to "${targetSuite.title}"`,
+        );
+        router.refresh();
+      } catch (err) {
+        prevSuitesByCase.forEach((prevSuiteId, id) => {
+          setCaseSuiteOverride([id], prevSuiteId);
+        });
+        toast.error(
+          err instanceof Error ? err.message : "Failed to move test case(s)",
+        );
+      }
+      return;
+    }
+
+    if (targetSuite.id === "unassigned") {
+      setDraggedSuiteId(null);
+      setDraggedCaseId(null);
+      setDropTarget(null);
+      return;
+    }
+
+    const rawText = e.dataTransfer.getData("text/plain");
+    const sourceId =
+      draggedSuiteId ||
+      e.dataTransfer.getData("application/x-qmaster-suite") ||
+      (rawText?.startsWith("suite:") ? rawText.slice("suite:".length) : rawText);
     const position = dropTarget?.position || "inside";
     setDraggedSuiteId(null);
+    setDraggedCaseId(null);
     setDropTarget(null);
 
     if (!sourceId || sourceId === targetSuite.id) return;
@@ -678,12 +929,16 @@ export const SuiteTree = ({
             level={0}
             projectCode={projectCode}
             selectedSuiteId={selectedSuiteId}
+            activeCaseId={activeCaseId}
+            onSelectCase={setActiveCaseId}
             onAddChild={handleOpenCreateModal}
             onDeleteClick={setSuiteToDelete}
             onRename={handleRenameSuite}
             draggedSuiteId={draggedSuiteId}
+            draggedCaseId={draggedCaseId}
             dropTarget={dropTarget}
             onDragStartSuite={handleDragStartSuite}
+            onDragStartCase={handleDragStartCase}
             onDragOverSuite={handleDragOverSuite}
             onDragLeaveSuite={handleDragLeaveSuite}
             onDropSuite={handleDropSuite}
@@ -698,20 +953,25 @@ export const SuiteTree = ({
               title: "Unassigned Test Cases",
               caseCount: unassignedCount,
               children: [],
+              cases: unassignedCases,
             }}
             level={0}
             projectCode={projectCode}
             selectedSuiteId={selectedSuiteId}
+            activeCaseId={activeCaseId}
+            onSelectCase={setActiveCaseId}
             onAddChild={() => {}}
             onDeleteClick={() => {}}
             onRename={async () => {}}
-            draggedSuiteId={null}
-            dropTarget={null}
+            draggedSuiteId={draggedSuiteId}
+            draggedCaseId={draggedCaseId}
+            dropTarget={dropTarget}
             onDragStartSuite={() => {}}
-            onDragOverSuite={() => {}}
-            onDragLeaveSuite={() => {}}
-            onDropSuite={() => {}}
-            onDragEndSuite={() => {}}
+            onDragStartCase={handleDragStartCase}
+            onDragOverSuite={handleDragOverSuite}
+            onDragLeaveSuite={handleDragLeaveSuite}
+            onDropSuite={handleDropSuite}
+            onDragEndSuite={handleDragEndSuite}
           />
         )}
       </div>
