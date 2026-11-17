@@ -33,6 +33,9 @@
   --color-skip: var(--skip);
   --color-skip-soft: var(--skip-soft);
   --color-skip-foreground: var(--skip-foreground);
+  --color-invalid: var(--invalid);
+  --color-invalid-soft: var(--invalid-soft);
+  --color-invalid-foreground: var(--invalid-foreground);
 
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
@@ -162,6 +165,7 @@
   --skip-foreground: var(--neutral-700);
   --invalid: var(--orange-700);
   --invalid-soft: var(--orange-100);
+  --invalid-foreground: var(--orange-700);
 
   --heat-0: oklch(0.62 0.2 27);
   --heat-1: oklch(0.74 0.15 52);
@@ -227,6 +231,7 @@
   --skip-foreground: var(--neutral-300);
   --invalid: var(--orange-500);
   --invalid-soft: var(--orange-900);
+  --invalid-foreground: var(--orange-100);
 
   --heat-0: oklch(0.6 0.2 27);
   --heat-1: oklch(0.66 0.16 52);
@@ -346,6 +351,13 @@ button:disabled {
 .qm-status-skip {
   background: var(--skip-soft);
   color: var(--skip-foreground);
+}
+
+/* Invalid is a verdict on the test case, not on the software, so it is the one
+   status chip that does not share a hue with pass/fail/block/skip. */
+.qm-status-invalid {
+  background: var(--invalid-soft);
+  color: var(--invalid-foreground);
 }
 
 .qm-mono {

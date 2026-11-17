@@ -30,6 +30,7 @@ import {
   Image as ImageIcon,
   Ban,
   SkipForward,
+  FileX,
   Circle,
   GitBranch,
   Play,
@@ -44,6 +45,7 @@ import { toast } from "sonner";
 import { MAX_UPLOAD_BYTES, tooLargeMessage } from "@/lib/upload-limits";
 import { isDocumentUrl, isVideoUrl } from "@/lib/attachment-kind";
 import { isRunOpen } from "@/lib/run-open-status";
+import { runStats as computeRunStats } from "@/lib/run-stats";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { createPortal } from "react-dom";
@@ -183,10 +185,46 @@ function statusVisual(status?: string): StatusVisual {
       return { Icon: Ban, color: "var(--warning)", soft: "var(--warning-soft)", label: "Block" };
     case "SKIPPED":
       return { Icon: SkipForward, color: "var(--skip)", soft: "var(--skip-soft)", label: "Skip" };
+    case "INVALID":
+      // The one status that is not a verdict on the software: the test case
+      // itself is wrong. It gets its own hue so it never reads as a near-miss
+      // of Block, which is the status it is most often confused with.
+      return { Icon: FileX, color: "var(--invalid)", soft: "var(--invalid-soft)", label: "Invalid" };
     default:
       return { Icon: Circle, color: "var(--text-faint)", soft: "transparent", label: "—" };
   }
 }
+/**
+ * The verdicts behind "More", with the sentence that tells them apart.
+ *
+ * Block, Skip and Invalid answer three different questions and were being used
+ * interchangeably — most often Skip for all three. The distinction that matters
+ * is what you do next: Block and Skip come back, Invalid goes to the repository.
+ */
+const VERDICT_OPTIONS = [
+  {
+    status: "BLOCKED",
+    label: "Blocked",
+    hint: "Could not test it — something upstream is broken or the data is missing. Comes back this run.",
+    Icon: Ban,
+    color: "var(--warning)",
+  },
+  {
+    status: "SKIPPED",
+    label: "Skipped",
+    hint: "Deliberately not run this time — out of scope, or the environment cannot support it.",
+    Icon: SkipForward,
+    color: "var(--skip)",
+  },
+  {
+    status: "INVALID",
+    label: "Invalid",
+    hint: "The test case itself is wrong — it does not match the AC, or it is out of date. Fix it in the repository.",
+    Icon: FileX,
+    color: "var(--invalid)",
+  },
+] as const;
+
 function priorityVisual(priority?: string) {
   const p = (priority || "MEDIUM").toUpperCase();
   if (p === "HIGH" || p === "CRITICAL")
@@ -528,6 +566,13 @@ export default function RunExecutionClient({
   const [mainMenuOpen, setMainMenuOpen] = useState(false);
   const mainMenuRef = React.useRef<HTMLDivElement>(null);
 
+  // The runner's "More" verdicts (Block / Skip / Invalid). Pass and Fail are
+  // the overwhelming majority of presses and stay as full-width buttons; the
+  // other three live behind one control so the bar does not become six
+  // equal-weight targets to read through on every case.
+  const [verdictMenuOpen, setVerdictMenuOpen] = useState(false);
+  const verdictMenuRef = React.useRef<HTMLDivElement>(null);
+
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [assigningResultId, setAssigningResultId] = useState<string | null>(
     null,
@@ -558,6 +603,27 @@ export default function RunExecutionClient({
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [mainMenuOpen]);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        verdictMenuRef.current &&
+        !verdictMenuRef.current.contains(event.target as Node)
+      ) {
+        setVerdictMenuOpen(false);
+      }
+    };
+    if (verdictMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [verdictMenuOpen]);
+
+  // Moving to another case closes the menu with it, so it never reopens over a
+  // case the tester has already moved on from.
+  React.useEffect(() => {
+    setVerdictMenuOpen(false);
+  }, [activeResultId]);
 
   React.useEffect(() => {
     if (run?.status !== "ACTIVE") return;
@@ -907,6 +973,7 @@ export default function RunExecutionClient({
       failed: 0,
       blocked: 0,
       skipped: 0,
+      invalid: 0,
       untested: 0,
       total: 0,
     };
@@ -917,6 +984,7 @@ export default function RunExecutionClient({
       else if (c.status === "FAILED") stats.failed++;
       else if (c.status === "BLOCKED") stats.blocked++;
       else if (c.status === "SKIPPED") stats.skipped++;
+      else if (c.status === "INVALID") stats.invalid++;
       else stats.untested++;
     });
     const children = childrenMap.get(suiteId) || [];
@@ -927,36 +995,19 @@ export default function RunExecutionClient({
       stats.failed += childStats.failed;
       stats.blocked += childStats.blocked;
       stats.skipped += childStats.skipped;
+      stats.invalid += childStats.invalid;
       stats.untested += childStats.untested;
     });
     return stats;
   };
 
-  const runStats = useMemo(() => {
-    let stats = {
-      passed: 0,
-      failed: 0,
-      blocked: 0,
-      skipped: 0,
-      untested: 0,
-      total: run.results.length,
-    };
-    run.results.forEach((r: any) => {
-      if (r.status === "PASSED") stats.passed++;
-      else if (r.status === "FAILED") stats.failed++;
-      else if (r.status === "BLOCKED") stats.blocked++;
-      else if (r.status === "SKIPPED") stats.skipped++;
-      else stats.untested++;
-    });
-    return stats;
-  }, [run.results]);
+  // This screen used to count the run itself, with its own `else untested++`
+  // that swept INVALID in with the cases nobody had opened yet. `runStats` in
+  // lib is the one definition every other screen already uses, so the runner
+  // reads the same numbers as the board and the dashboards.
+  const runStats = useMemo(() => computeRunStats(run.results), [run.results]);
 
-  const completionRate =
-    runStats.total > 0
-      ? Math.round(
-          ((runStats.total - runStats.untested) / runStats.total) * 100,
-        )
-      : 0;
+  const completionRate = runStats.completionPercent;
 
   const renderConicGradient = () => {
     if (runStats.total === 0) return "conic-gradient(var(--border-color) 0% 100%)";
@@ -964,6 +1015,7 @@ export default function RunExecutionClient({
     const failed = (runStats.failed / runStats.total) * 100;
     const blocked = (runStats.blocked / runStats.total) * 100;
     const skipped = (runStats.skipped / runStats.total) * 100;
+    const invalid = (runStats.invalid / runStats.total) * 100;
     const untested = (runStats.untested / runStats.total) * 100;
 
     let current = 0;
@@ -984,6 +1036,10 @@ export default function RunExecutionClient({
     if (skipped > 0) {
       gradient += `var(--skip) ${current}% ${current + skipped}%, `;
       current += skipped;
+    }
+    if (invalid > 0) {
+      gradient += `var(--invalid) ${current}% ${current + invalid}%, `;
+      current += invalid;
     }
     if (untested > 0) {
       gradient += `var(--border-color) ${current}% ${current + untested}%`;
@@ -1016,6 +1072,33 @@ export default function RunExecutionClient({
   // One source of truth for "can results still be changed", matching the
   // server's rule so the screen never offers an edit that will be refused.
   const runOpen = isRunOpen(run?.status);
+
+  /**
+   * Record one of the "More" verdicts and close the menu.
+   *
+   * Invalid gets a follow-up, because it is the only verdict whose next step is
+   * somewhere else: the case needs editing, and without the shortcut the tester
+   * has to leave the run and hunt for it in the repository.
+   */
+  const chooseVerdict = (result: any, status: string) => {
+    setVerdictMenuOpen(false);
+    updateResult(result.id, status);
+    if (status === "INVALID") {
+      const caseId = result?.testCase?.id;
+      toast("Marked invalid — it will not count towards the pass rate.", {
+        description: "An invalid case says the test is wrong, not the build.",
+        ...(caseId
+          ? {
+              action: {
+                label: "Fix the case",
+                onClick: () =>
+                  router.push(`/projects/${projectCode}/cases/${caseId}/edit`),
+              },
+            }
+          : {}),
+      });
+    }
+  };
 
   const updateResult = async (resultId: string, status: string) => {
     try {
@@ -1135,7 +1218,12 @@ export default function RunExecutionClient({
     let newGlobalStatus = currentActiveResult?.status;
     const testCase = currentActiveResult?.testCase;
 
-    if (testCase && testCase.steps && testCase.steps.length > 0) {
+    // Invalid is a judgement about the case as a whole — its steps are the
+    // thing that is wrong — so editing a step must not quietly re-derive the
+    // verdict back to Failed or In progress and lose it.
+    const keepsVerdict = currentActiveResult?.status === "INVALID";
+
+    if (!keepsVerdict && testCase && testCase.steps && testCase.steps.length > 0) {
       const stepStatuses = testCase.steps.map(
         (s: any) => newStepResults[s.id]?.status,
       );
@@ -1265,6 +1353,8 @@ export default function RunExecutionClient({
         return "bg-warning text-[var(--neutral-950)]";
       case "SKIPPED":
         return "bg-skip text-white";
+      case "INVALID":
+        return "bg-invalid text-white";
       default:
         return "bg-surface-hover text-text-muted border border-border";
     }
@@ -1276,6 +1366,7 @@ export default function RunExecutionClient({
     const failedPct = (stats.failed / stats.total) * 100;
     const blockedPct = (stats.blocked / stats.total) * 100;
     const skippedPct = (stats.skipped / stats.total) * 100;
+    const invalidPct = ((stats.invalid || 0) / stats.total) * 100;
 
     return (
       <div className="flex h-2 w-48 rounded-full bg-surface-hover overflow-hidden ml-4 border border-border">
@@ -1290,6 +1381,9 @@ export default function RunExecutionClient({
         )}
         {stats.skipped > 0 && (
           <div style={{ width: `${skippedPct}%` }} className="bg-skip" />
+        )}
+        {stats.invalid > 0 && (
+          <div style={{ width: `${invalidPct}%` }} className="bg-invalid" />
         )}
       </div>
     );
@@ -1652,7 +1746,10 @@ export default function RunExecutionClient({
           <div className="flex items-center gap-[14px]">
             <div className="text-right">
               <div className="text-[11px] text-text-faint">Progress</div>
-              <div className="font-bold tabular-nums">{runStats.passed + runStats.failed + runStats.blocked} / {runStats.total}</div>
+              {/* Everything with a verdict, matching the bar beside it. Adding
+                  up only pass/fail/block made the number disagree with the bar
+                  on any run that skipped a case. */}
+              <div className="font-bold tabular-nums">{runStats.decided} / {runStats.total}</div>
             </div>
             <div className="w-[160px] h-[7px] rounded-[4px] bg-surface-hover overflow-hidden">
               <div className="h-full bg-primary transition-all" style={{ width: `${completionRate}%` }} />
@@ -1715,7 +1812,7 @@ export default function RunExecutionClient({
 
             {/* Status filters */}
             <div className="flex flex-wrap gap-[5px] p-[9px_16px] bg-surface border-b border-border">
-              {['PASSED', 'FAILED', 'BLOCKED', 'SKIPPED', 'IN_PROGRESS'].map(st => (
+              {['PASSED', 'FAILED', 'BLOCKED', 'SKIPPED', 'INVALID', 'IN_PROGRESS'].map(st => (
                  <button key={st} onClick={() => setStatusFilter(statusFilter === st ? null : st)} className={`px-2.5 py-1 rounded text-[11.5px] font-bold ${statusFilter === st ? "bg-primary-light text-primary" : "bg-surface-hover text-text-muted hover:text-text-main"}`}>
                    {st}
                  </button>
@@ -1755,7 +1852,7 @@ export default function RunExecutionClient({
             (() => {
               const caseStatusVis = statusVisual(activeResult.status);
               const casePriVis = priorityVisual(activeResult.testCase.priority);
-              const statusLabelMap: Record<string, string> = { PASSED: "Passed", FAILED: "Failed", BLOCKED: "Blocked", SKIPPED: "Skipped", IN_PROGRESS: "In progress" };
+              const statusLabelMap: Record<string, string> = { PASSED: "Passed", FAILED: "Failed", BLOCKED: "Blocked", SKIPPED: "Skipped", INVALID: "Invalid", IN_PROGRESS: "In progress" };
               const caseStatusLabel = statusLabelMap[activeResult.status] || "Untested";
               const tags: string[] = Array.isArray(activeResult.testCase.tags)
                 ? activeResult.testCase.tags
@@ -2004,8 +2101,40 @@ export default function RunExecutionClient({
                 <div className="shrink-0 border-t border-border bg-background px-[24px] py-[14px] flex items-center gap-[9px]">
                   <button onClick={() => updateResult(activeResult.id, "PASSED")} className="flex-1 flex items-center justify-center gap-[7px] h-[44px] rounded-[10px] bg-success text-white font-bold text-[14px] shadow-sm hover:opacity-90 transition-opacity"><CheckCircle2 size={19} />Pass</button>
                   <button onClick={() => updateResult(activeResult.id, "FAILED")} className="flex-1 flex items-center justify-center gap-[7px] h-[44px] rounded-[10px] bg-danger text-white font-bold text-[14px] shadow-sm hover:opacity-90 transition-opacity"><XCircle size={19} />Fail</button>
-                  <button onClick={() => updateResult(activeResult.id, "BLOCKED")} className="flex items-center justify-center gap-[7px] h-[44px] px-[18px] rounded-[10px] bg-surface border border-[var(--border-strong)] text-warning font-bold text-[14px] hover:bg-surface-hover transition-colors"><Ban size={19} />Block</button>
-                  <button onClick={() => updateResult(activeResult.id, "SKIPPED")} className="flex items-center justify-center gap-[7px] h-[44px] px-[18px] rounded-[10px] bg-surface border border-[var(--border-strong)] text-text-muted font-bold text-[14px] hover:bg-surface-hover transition-colors"><SkipForward size={19} />Skip</button>
+                  <div className="relative" ref={verdictMenuRef}>
+                    <button
+                      onClick={() => setVerdictMenuOpen((o) => !o)}
+                      aria-haspopup="menu"
+                      aria-expanded={verdictMenuOpen}
+                      title="Other verdicts"
+                      className={`flex items-center justify-center gap-[6px] h-[44px] px-[16px] rounded-[10px] border border-[var(--border-strong)] font-bold text-[14px] transition-colors ${verdictMenuOpen ? "bg-surface-hover text-text-main" : "bg-surface text-text-muted hover:bg-surface-hover"}`}
+                    >
+                      More <ChevronDown size={16} className={`transition-transform ${verdictMenuOpen ? "rotate-180" : ""}`} />
+                    </button>
+                    {verdictMenuOpen && (
+                      /* Opens upward: the bar is pinned to the bottom of the
+                         drawer, so a menu dropping down would fall off-screen. */
+                      <div role="menu" className="absolute bottom-full right-0 mb-[8px] w-[320px] bg-surface border border-border rounded-[12px] shadow-[var(--shadow-lg)] py-[6px] z-[80]">
+                        {VERDICT_OPTIONS.map((opt) => (
+                          <button
+                            key={opt.status}
+                            role="menuitem"
+                            onClick={() => chooseVerdict(activeResult, opt.status)}
+                            className="w-full text-left px-[14px] py-[9px] hover:bg-surface-hover transition-colors flex items-start gap-[10px]"
+                          >
+                            <opt.Icon size={17} style={{ color: opt.color }} className="mt-[1px] shrink-0" />
+                            <span className="min-w-0">
+                              <span className="block font-bold text-[13.5px] text-text-main">{opt.label}</span>
+                              {/* The three are confused for each other constantly,
+                                  so the menu says what each one means rather than
+                                  leaving it to the tester to remember. */}
+                              <span className="block text-[11.5px] text-text-muted leading-[1.45]">{opt.hint}</span>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <button onClick={() => setReportingResult(activeResult)} title="Report bug / AI triage" className="w-[44px] h-[44px] rounded-[10px] bg-surface border border-border flex items-center justify-center text-danger hover:bg-danger-soft transition-colors"><Bug size={20} /></button>
                 </div>
               ) : (

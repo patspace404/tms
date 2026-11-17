@@ -22,12 +22,18 @@ export function PdfReportTemplate({
     run.results?.filter((r: any) => r.status === "BLOCKED").length || 0;
   const skipped =
     run.results?.filter((r: any) => r.status === "SKIPPED").length || 0;
+  const invalid =
+    run.results?.filter((r: any) => r.status === "INVALID").length || 0;
   const untested =
     run.results?.filter(
       (r: any) => r.status === "UNTESTED" || r.status === "IN_PROGRESS",
     ).length || 0;
 
-  const completionRate = total > 0 ? Math.round((passed / total) * 100) : 0;
+  // An invalid case says the test was written wrong, not that the build failed,
+  // so it is left out of the denominator — otherwise a report handed to a
+  // customer understates the build by however many cases need rewriting.
+  const judged = total - invalid;
+  const completionRate = judged > 0 ? Math.round((passed / judged) * 100) : 0;
 
   // How long a run took is an internal matter — it says more about the tester's
   // day than about the software, and it is not something to hand a customer.
@@ -484,6 +490,7 @@ export function PdfReportTemplate({
                   { n: failed, c: "#dc2626" },
                   { n: blocked, c: "#d97706" },
                   { n: skipped, c: "#0891b2" },
+                  { n: invalid, c: "#c2410c" },
                   { n: untested, c: "#94a3b8" },
                 ].map(
                   (seg, i) =>
@@ -511,6 +518,7 @@ export function PdfReportTemplate({
                   { label: "Failed", n: failed, c: "#dc2626" },
                   { label: "Blocked", n: blocked, c: "#d97706" },
                   { label: "Skipped", n: skipped, c: "#0891b2" },
+                  { label: "Invalid", n: invalid, c: "#c2410c" },
                   { label: "Untested", n: untested, c: "#94a3b8" },
                 ].map((seg) => (
                   <div
@@ -649,6 +657,10 @@ export function PdfReportTemplate({
                 if (res.status === "BLOCKED") {
                   badgeBg = "#fef3c7";
                   badgeColor = "#d97706";
+                }
+                if (res.status === "INVALID") {
+                  badgeBg = "#ffedd5";
+                  badgeColor = "#c2410c";
                 }
 
                 // Global attachments and comments

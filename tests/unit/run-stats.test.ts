@@ -27,10 +27,31 @@ describe("runStats", () => {
     expect(s.passRate).toBe(89); // 170 / 191
   });
 
-  it("counts invalid as decided too", () => {
+  it("counts invalid as decided, but keeps it out of the pass rate", () => {
+    // An invalid case says the test was written wrong, not that the build is
+    // broken. The run is finished, and the eight cases that did test something
+    // all passed, so the build's pass rate is 100 — not 80.
     const s = runStats(make({ PASSED: 8, INVALID: 2 }));
+
+    expect(s.decided).toBe(10);
+    expect(s.judged).toBe(8);
     expect(s.completionPercent).toBe(100);
-    expect(s.passRate).toBe(80);
+    expect(s.passRate).toBe(100);
+  });
+
+  it("reports 0 rather than NaN when every case was invalid", () => {
+    const s = runStats(make({ INVALID: 4 }));
+    expect(s.judged).toBe(0);
+    expect(s.passRate).toBe(0);
+    expect(s.completionPercent).toBe(100);
+  });
+
+  it("still counts blocked and skipped against the pass rate", () => {
+    // Only INVALID is excused. Blocked and skipped are facts about this run of
+    // the software, so they stay in the denominator as they always have.
+    const s = runStats(make({ PASSED: 6, BLOCKED: 2, SKIPPED: 2 }));
+    expect(s.judged).toBe(10);
+    expect(s.passRate).toBe(60);
   });
 
   it("leaves IN_PROGRESS out — those really are untested", () => {
