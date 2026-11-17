@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareCases, typeLabelOf } from "@/lib/case-sort";
+import { automationLabelOf, compareCases } from "@/lib/case-sort";
 
 const c = (tc: any) => ({ sequenceNumber: 0, title: "", ...tc });
 const sortBy = (rows: any[], key: any, dir: any = "asc") =>
@@ -61,26 +61,38 @@ describe("compareCases", () => {
     ]);
   });
 
-  it("orders by the label shown in the Type column", () => {
+  it("orders the Automation column by progress, not alphabetically", () => {
     const rows = [
-      c({ type: "FUNCTIONAL", sequenceNumber: 1 }),
-      c({ automationStatus: "AUTOMATED", sequenceNumber: 2 }),
+      c({ automationStatus: "AUTOMATED", sequenceNumber: 1 }),
+      c({ automationStatus: "MANUAL", sequenceNumber: 2 }),
+      c({ automationStatus: "TO_BE_AUTOMATED", sequenceNumber: 3 }),
     ];
-    expect(sortBy(rows, "type").map((r) => typeLabelOf(r))).toEqual([
+    expect(sortBy(rows, "automation").map((r) => automationLabelOf(r))).toEqual([
+      "Manual",
+      "To automate",
       "Automated",
-      "Functional",
     ]);
   });
 });
 
-describe("typeLabelOf", () => {
-  it("calls an untyped case Manual", () => {
-    expect(typeLabelOf({})).toBe("Manual");
+describe("automationLabelOf", () => {
+  it("names each of the three states", () => {
+    expect(automationLabelOf({ automationStatus: "MANUAL" })).toBe("Manual");
+    expect(automationLabelOf({ automationStatus: "TO_BE_AUTOMATED" })).toBe(
+      "To automate",
+    );
+    expect(automationLabelOf({ automationStatus: "AUTOMATED" })).toBe("Automated");
   });
 
-  it("lets an explicit type win over automation status", () => {
-    expect(typeLabelOf({ type: "NEGATIVE", automationStatus: "AUTOMATED" })).toBe(
-      "Negative",
+  it("treats a case still waiting to be automated as its own state", () => {
+    // The old Type column told only AUTOMATED apart, so 321 of PTTEP's 354
+    // cases read as "Manual" while their detail panel said "To automate".
+    expect(automationLabelOf({ automationStatus: "TO_BE_AUTOMATED" })).not.toBe(
+      "Manual",
     );
+  });
+
+  it("falls back to Manual when nothing is set", () => {
+    expect(automationLabelOf({})).toBe("Manual");
   });
 });

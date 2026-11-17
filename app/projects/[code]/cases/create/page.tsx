@@ -413,7 +413,7 @@ function CreateCaseContent({
                   className="w-full h-[38px] px-[12px] rounded-[10px] bg-surface shadow-[inset_0_0_0_1px_var(--border)] text-[13px] appearance-none outline-none focus:shadow-[inset_0_0_0_1px_var(--primary)]"
                 >
                   <option value="MANUAL">Manual</option>
-                  <option value="TO_BE_AUTOMATED">To be automated</option>
+                  <option value="TO_BE_AUTOMATED">To automate</option>
                   <option value="AUTOMATED">Automated</option>
                 </select>
                 <ChevronDown size={18} className="absolute right-[10px] top-1/2 -translate-y-1/2 text-text-faint pointer-events-none" />

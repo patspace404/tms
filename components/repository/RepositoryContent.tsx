@@ -41,6 +41,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CommentThread } from "@/components/ui/CommentThread";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { ChevronRight } from "lucide-react";
+import { automationLabelOf } from "@/lib/case-sort";
 import { formatThaiTime } from "@/lib/utils";
 
 interface RepositoryContentProps {
@@ -731,24 +732,11 @@ export function RepositoryContent({
                   </span>
                 </div>
                 <div>
-                  <div className="text-[12.5px] text-text-faint mb-1">Type</div>
-                  <span className="text-[12.5px] font-medium text-text-main">
-                    {activeTestCase.type
-                      ? activeTestCase.type.charAt(0) +
-                        activeTestCase.type.slice(1).toLowerCase()
-                      : "Functional"}
-                  </span>
-                </div>
-                <div>
                   <div className="text-[12.5px] text-text-faint mb-1">
                     Automation
                   </div>
                   <span className="text-[12.5px] font-medium text-text-main">
-                    {activeTestCase.automationStatus === "AUTOMATED"
-                      ? "Automated"
-                      : activeTestCase.automationStatus === "TO_BE_AUTOMATED"
-                        ? "To automate"
-                        : "Manual"}
+                    {automationLabelOf(activeTestCase)}
                   </span>
                 </div>
                 <div>

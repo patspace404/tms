@@ -6,10 +6,15 @@
  * re-render — are pinned down by tests.
  */
 
-export type CaseSortKey = "id" | "title" | "priority" | "type" | "owner";
+export type CaseSortKey = "id" | "title" | "priority" | "automation" | "owner";
 export type CaseSortDir = "asc" | "desc";
 
 const PRIORITY_RANK: Record<string, number> = { HIGH: 3, MEDIUM: 2, LOW: 1 };
+const AUTOMATION_RANK: Record<string, number> = {
+  Manual: 1,
+  "To automate": 2,
+  Automated: 3,
+};
 
 /** Who a case belongs to: its assignee if it has one, otherwise its author. */
 export function ownerLabel(tc: any): string {
@@ -22,13 +27,23 @@ export function ownerLabel(tc: any): string {
   );
 }
 
-/** The word shown in the Type column. */
-export function typeLabelOf(tc: any): string {
-  const t = (tc.type || "").toUpperCase();
-  if (t === "NEGATIVE") return "Negative";
-  if (t === "VISUAL") return "Visual";
-  if (tc.automationStatus === "AUTOMATED") return "Automated";
-  return tc.type ? "Functional" : "Manual";
+/**
+ * The word shown in the Automation column.
+ *
+ * This used to be a "Type" column that read `tc.type` and fell back to
+ * "Manual". A test case has no type — the column was showing automation status
+ * under the wrong name, and only told two of its three states apart, so every
+ * case waiting to be automated read as "Manual".
+ */
+export function automationLabelOf(tc: any): string {
+  switch ((tc.automationStatus || "MANUAL").toUpperCase()) {
+    case "AUTOMATED":
+      return "Automated";
+    case "TO_BE_AUTOMATED":
+      return "To automate";
+    default:
+      return "Manual";
+  }
 }
 
 /** What a column sorts on. Case numbers stay numeric so 9 lands before 10. */
@@ -40,8 +55,9 @@ export function caseSortValue(tc: any, key: CaseSortKey): number | string {
       return (tc.title || "").toLowerCase();
     case "priority":
       return PRIORITY_RANK[(tc.priority || "").toUpperCase()] ?? 0;
-    case "type":
-      return typeLabelOf(tc).toLowerCase();
+    case "automation":
+      // Ordered by how far along the case is, not alphabetically.
+      return AUTOMATION_RANK[automationLabelOf(tc)] ?? 0;
     case "owner":
       return ownerLabel(tc).toLowerCase();
   }

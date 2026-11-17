@@ -7,10 +7,9 @@ import {
   ChevronsUp,
   Minus,
   ChevronDown,
-  FunctionSquare,
-  Eye,
-  Ban,
   Bot,
+  Clock,
+  Hand,
   Tag as TagIcon,
   ListPlus,
   Trash2,
@@ -26,7 +25,7 @@ import { useProjectRole } from "@/components/providers/ProjectRoleProvider";
 import {
   compareCases,
   ownerLabel,
-  typeLabelOf,
+  automationLabelOf,
   type CaseSortDir,
   type CaseSortKey,
 } from "@/lib/case-sort";
@@ -45,16 +44,9 @@ const getPriIcon = (pri?: string) => {
   }
 };
 
-const getTypeMeta = (tc: any) => {
-  const label = typeLabelOf(tc);
-  const Icon =
-    label === "Negative"
-      ? Ban
-      : label === "Visual"
-        ? Eye
-        : label === "Automated"
-          ? Bot
-          : FunctionSquare;
+const getAutomationMeta = (tc: any) => {
+  const label = automationLabelOf(tc);
+  const Icon = label === "Automated" ? Bot : label === "To automate" ? Clock : Hand;
   return { Icon, label };
 };
 
@@ -236,9 +228,8 @@ export function SuiteList({
   const someOnPageSelected =
     !allOnPageSelected && pagedCases.some((c: any) => selectedCases.has(c.id));
 
-  // Dense table: check · priority · type · ID · TITLE · TAGS · TYPE · OWNER
-  const GRID =
-    "30px 24px 24px 84px minmax(0,1fr) 150px 112px 56px";
+  // Dense table: check · priority · ID · TITLE · TAGS · AUTOMATION · OWNER
+  const GRID = "30px 24px 84px minmax(0,1fr) 150px 124px 56px";
 
   return (
     <div className="flex flex-col min-w-0 h-full">
@@ -326,11 +317,10 @@ export function SuiteList({
         <div className="flex justify-center">
           {sortHeader(<ChevronsUp size={13} />, "priority", "", "priority")}
         </div>
-        <div></div>
         <div>{sortHeader("ID", "id")}</div>
         <div>{sortHeader("Title", "title")}</div>
         <div>Tags</div>
-        <div>{sortHeader("Type", "type")}</div>
+        <div>{sortHeader("Automation", "automation")}</div>
         <div className="flex justify-end">{sortHeader("Owner", "owner")}</div>
       </div>
 
@@ -355,7 +345,8 @@ export function SuiteList({
             const isSelected = selectedCases.has(tc.id);
             const isActive = activeCaseId === tc.id;
             const { Icon: PriIcon, color: priColor } = getPriIcon(tc.priority);
-            const { Icon: TypeIcon, label: typeLabel } = getTypeMeta(tc);
+            const { Icon: AutomationIcon, label: automationLabel } =
+              getAutomationMeta(tc);
 
             return (
               <div
@@ -435,10 +426,6 @@ export function SuiteList({
                   <PriIcon size={18} style={{ color: priColor }} />
                 </div>
 
-                <div className="flex items-center justify-center text-text-faint" title={typeLabel}>
-                  <TypeIcon size={16} />
-                </div>
-
                 <div className="qm-mono text-[12.5px] text-text-faint tabular-nums truncate">
                   {projectCode}-{tc.sequenceNumber || tc.id.substring(0, 4)}
                 </div>
@@ -467,8 +454,8 @@ export function SuiteList({
                 </div>
 
                 <div className="flex items-center gap-[6px] text-[13px] text-text-muted whitespace-nowrap">
-                  <TypeIcon size={16} className="text-text-faint" />
-                  {typeLabel}
+                  <AutomationIcon size={16} className="text-text-faint" />
+                  {automationLabel}
                 </div>
 
                 <div className="flex justify-end">

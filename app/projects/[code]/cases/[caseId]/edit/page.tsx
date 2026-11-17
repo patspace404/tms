@@ -521,7 +521,7 @@ export default function TestCaseEditor() {
                 className="w-full px-4 py-2.5 text-[13px] font-semibold bg-surface-hover/50 border border-border/80 rounded-xl shadow-inner focus:outline-none focus:ring-4 focus:ring-primary/20 focus:border-primary transition-all hover:border-text-muted/40 text-text-main appearance-none cursor-pointer"
               >
                 <option value="MANUAL">Manual</option>
-                <option value="TO_BE_AUTOMATED">To be automated</option>
+                <option value="TO_BE_AUTOMATED">To automate</option>
                 <option value="AUTOMATED">Automated</option>
               </select>
             </div>

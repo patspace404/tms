@@ -32,7 +32,7 @@ const SEVERITY = [
 ];
 const AUTOMATION = [
   { v: "MANUAL", l: "Manual" },
-  { v: "TO_BE_AUTOMATED", l: "To be automated" },
+  { v: "TO_BE_AUTOMATED", l: "To automate" },
   { v: "AUTOMATED", l: "Automated" },
 ];
 
